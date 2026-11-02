@@ -1,3 +1,5 @@
+import base64
+from io import BytesIO
 import os
 import re
 import hmac
@@ -300,6 +302,26 @@ def init_db():
 
     conn.commit()
 
+    # Migrações seguras com PRAGMA table_info
+    c.execute("PRAGMA table_info(studios)")
+    st_cols = [r['name'] if isinstance(r, dict) else r[1] for r in c.fetchall()]
+    if 'consent_ip' not in st_cols:
+        c.execute("ALTER TABLE studios ADD COLUMN consent_ip TEXT")
+    if 'status' not in st_cols:
+        c.execute("ALTER TABLE studios ADD COLUMN status TEXT DEFAULT 'configurando'")
+    if 'active_niches' not in st_cols:
+        c.execute("""ALTER TABLE studios ADD COLUMN active_niches TEXT DEFAULT '["gestante", "newborn", "familia"]'""")
+
+    c.execute("PRAGMA table_info(slots)")
+    slot_cols = [r['name'] if isinstance(r, dict) else r[1] for r in c.fetchall()]
+    if 'niche' not in slot_cols:
+        c.execute("ALTER TABLE slots ADD COLUMN niche TEXT DEFAULT 'Geral'")
+    if 'receipt_path' not in slot_cols:
+        c.execute("ALTER TABLE slots ADD COLUMN receipt_path TEXT")
+
+    c.execute("CREATE INDEX IF NOT EXISTS idx_studios_dashboard_token ON studios(dashboard_token)")
+    conn.commit()
+
     # Inicializa tabelas do módulo Instagram
     try:
         from instagram_webhook import init_instagram_db
@@ -472,6 +494,89 @@ def ensure_qr_comecar():
     return qr_path
 
 
+
+def process_niche_photos(photos_dict: dict) -> dict:
+    """Comprime fotos base64 com Pillow para no máximo 800px e 70% qualidade, estruturando por nicho."""
+    processed = {"gestante": [], "newborn": [], "familia": []}
+    if not isinstance(photos_dict, dict):
+        return processed
+    
+    # Mapeia chaves com acento ou variações
+    norm_map = {}
+    for k, v in photos_dict.items():
+        k_norm = k.lower().replace("í", "i").replace("ã", "a").replace("é", "e")
+        if "gestant" in k_norm:
+            norm_map["gestante"] = v
+        elif "newborn" in k_norm:
+            norm_map["newborn"] = v
+        elif "famili" in k_norm:
+            norm_map["familia"] = v
+        else:
+            norm_map[k_norm] = v
+
+    for niche in ["gestante", "newborn", "familia"]:
+        items = norm_map.get(niche) or []
+        for item in items[:3]:
+            if not item or not isinstance(item, str):
+                continue
+            if item.startswith("data:image"):
+                try:
+                    header, data = item.split(",", 1)
+                    img_data = base64.b64decode(data)
+                    img = Image.open(BytesIO(img_data)).convert("RGB")
+                    img.thumbnail((800, 800))
+                    out = BytesIO()
+                    img.save(out, format="JPEG", quality=70)
+                    b64_out = base64.b64encode(out.getvalue()).decode("utf-8")
+                    processed[niche].append(f"data:image/jpeg;base64,{b64_out}")
+                except Exception as e:
+                    logger.warning("Falha ao processar foto com Pillow: %s", e)
+                    processed[niche].append(item)
+            else:
+                processed[niche].append(item)
+    return processed
+
+
+DEFAULT_DEMO_PHOTOS = {
+    "gestante": [
+        "/static/demo_photos/gestante_1.jpg",
+        "/static/demo_photos/gestante_2.jpg",
+        "/static/demo_photos/gestante_3.jpg"
+    ],
+    "newborn": [
+        "/static/demo_photos/newborn_1.jpg",
+        "/static/demo_photos/newborn_2.jpg",
+        "/static/demo_photos/newborn_3.jpg"
+    ],
+    "familia": [
+        "/static/demo_photos/familia_1.jpg",
+        "/static/demo_photos/familia_2.jpg",
+        "/static/demo_photos/familia_3.jpg"
+    ]
+}
+
+def ensure_demo_photos(photos_dict: dict) -> dict:
+    result = {"gestante": [], "newborn": [], "familia": []}
+    if not isinstance(photos_dict, dict):
+        photos_dict = {}
+    for niche in ["gestante", "newborn", "familia"]:
+        items = photos_dict.get(niche) or []
+        valid_items = [p for p in items if p and isinstance(p, str)]
+        if not valid_items:
+            result[niche] = DEFAULT_DEMO_PHOTOS[niche].copy()
+        else:
+            result[niche] = valid_items[:3]
+    return result
+
+def get_font(candidates, size):
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                pass
+    return ImageFont.load_default()
+
 def generate_comprovante_png(
     studio_name: str,
     photographer_name: str,
@@ -479,45 +584,77 @@ def generate_comprovante_png(
     slot_human: str,
     comprovante_id: str,
     address: str = "Estúdio Principal — Atendimento com Hora Marcada",
+    niche: str = "Ensaio Fotográfico"
 ) -> str:
-    """Gera comprovante PNG elegante usando Pillow em /static/comprovantes/{id}.png."""
+    """
+    Gera comprovante PNG proporcional de alta estética (600x750px vertical).
+    Tipografia TrueType nítida e legível, cabeçalho verde #25D366 de 110px,
+    fundo branco #FFFFFF e badge ✔ CONFIRMADO.
+    """
     os.makedirs(COMPROVANTES_DIR, exist_ok=True)
     file_path = os.path.join(COMPROVANTES_DIR, f"{comprovante_id}.png")
 
-    width, height = 800, 480
-    img = Image.new("RGB", (width, height), "#0b141a")
+    width, height = 600, 750
+    img = Image.new("RGB", (width, height), "#F8FAFC")
     draw = ImageDraw.Draw(img)
 
-    # Moldura verde WhatsApp
-    draw.rounded_rectangle((20, 20, width - 20, height - 20), radius=24, fill="#202c33", outline="#25D366", width=4)
-    draw.rounded_rectangle((40, 40, width - 40, 115), radius=14, fill="#111b21")
-
-    font_title = ImageFont.load_default()
-    draw.text((65, 65), f"COMPROVANTE DE AGENDAMENTO - {studio_name.upper()}", fill="#25D366", font=font_title)
-
-    y = 145
-    lines = [
-        f"Codigo da Reserva : #{comprovante_id.upper()}",
-        f"Estudio           : {studio_name} (Fotografo: {photographer_name})",
-        f"Cliente           : {client_name}",
-        f"Data e Horario    : {slot_human}",
-        f"Endereco          : {address}",
-        f"Status            : HORARIO RESERVADO E CONFIRMADO",
+    font_bold_candidates = [
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
     ]
-    for line in lines:
-        draw.text((65, y), line, fill="#e9edef", font=font_title)
-        y += 42
+    font_regular_candidates = [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+    ]
 
-    draw.rounded_rectangle((60, height - 85, width - 60, height - 42), radius=10, fill="#25D366")
-    draw.text(
-        (85, height - 68),
-        "Apresente este comprovante no dia do seu ensaio fotografico!",
-        fill="#111b21",
-        font=font_title,
-    )
+    font_title = get_font(font_bold_candidates, 26)
+    font_subtitle = get_font(font_bold_candidates, 22)
+    font_label = get_font(font_regular_candidates, 20)
+    font_val = get_font(font_bold_candidates, 26)
+    font_badge = get_font(font_bold_candidates, 24)
+    font_footer = get_font(font_regular_candidates, 16)
+
+    # Card de fundo branco com borda arredondada
+    draw.rounded_rectangle((15, 15, width - 15, height - 15), radius=24, fill="#FFFFFF", outline="#E2E8F0", width=2)
+
+    # Cabeçalho verde #25D366 de 110px de altura
+    draw.rounded_rectangle((15, 15, width - 15, 125), radius=24, fill="#25D366")
+    draw.rectangle((15, 75, width - 15, 125), fill="#25D366")
+
+    clean_client = client_name if (client_name and client_name.strip() and client_name.strip().lower() != "cliente") else "Ensaio Agendado"
+    clean_studio = studio_name or "Estúdio"
+
+    draw.text((width / 2, 48), "COMPROVANTE DE AGENDAMENTO", fill="#FFFFFF", font=font_title, anchor="mm")
+    draw.text((width / 2, 88), clean_studio, fill="#FFFFFF", font=font_subtitle, anchor="mm")
+
+    y = 165
+    fields = [
+        ("Código da Reserva", f"#{comprovante_id.upper()}"),
+        ("Fotógrafo", photographer_name or "Gustavo"),
+        ("Cliente", clean_client),
+        ("Tipo de Ensaio", niche or "Ensaio Fotográfico"),
+        ("Data e Horário", slot_human),
+        ("Local do Ensaio", address)
+    ]
+
+    for label, val in fields:
+        draw.text((45, y), label.upper(), fill="#555555", font=font_label)
+        draw.text((45, y + 26), val, fill="#111111", font=font_val)
+        draw.line((45, y + 62, width - 45, y + 62), fill="#EDF2F7", width=1)
+        y += 70
+
+    # Rodapé: Badge ✔ CONFIRMADO (verde) + data/hora de emissão
+    draw.rounded_rectangle((45, height - 90, 260, height - 38), radius=12, fill="#DCFCE7", outline="#25D366", width=2)
+    draw.text((152, height - 64), "✔ CONFIRMADO", fill="#166534", font=font_badge, anchor="mm")
+
+    emissao_str = "Emitido em: " + now_sp().strftime("%d/%m/%Y %H:%M")
+    draw.text((width - 45, height - 64), emissao_str, fill="#718096", font=font_footer, anchor="rm")
 
     img.save(file_path, "PNG")
     return f"/static/comprovantes/{comprovante_id}.png"
+
 
 
 # ==============================================================================
@@ -799,16 +936,18 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
     conn.commit()
 
     # Passo 2: gera o comprovante PNG com Pillow e finaliza como 'booked'
+    niche_label = slot.get("niche") or "Ensaio Fotográfico"
     png_url = generate_comprovante_png(
         studio_name=studio.get("studio_name") or "Estúdio",
         photographer_name=studio.get("photographer_name") or "Gustavo",
-        client_name=client_name or f"Cliente {client_wa_id[-4:]}",
+        client_name=client_name if (client_name and client_name.strip() and client_name.strip().lower() != "cliente") else "Ensaio Agendado",
         slot_human=slot["human"],
         comprovante_id=comprovante_id,
+        niche=niche_label
     )
     c.execute(
-        "UPDATE slots SET status = 'booked', comprovante_id = ? WHERE id = ?",
-        (comprovante_id, slot["id"]),
+        "UPDATE slots SET status = 'booked', comprovante_id = ?, receipt_path = ? WHERE id = ?",
+        (comprovante_id, png_url, slot["id"]),
     )
     conn.commit()
     conn.close()
@@ -816,34 +955,77 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
 
 
 def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_text: str):
-    """Processa a mensagem do cliente com todas as regras de negócio e Gemini 1.5 Flash."""
+    """
+    Processa a mensagem do cliente com todas as regras de negócio:
+    - Saudação contextual espelhada (Bom dia/Boa tarde/Boa noite)
+    - Proibição absoluta do termo "Cliente" (pergunta "Como posso te chamar?" se desconhecido)
+    - Suporte a botões interativos clicáveis e nichos ativos configurados
+    - Gemini 1.5 Flash com persona humanizada da secretária
+    Retorna: (reply_text, media_url, waiting_human, options_list)
+    """
     secretary_name = studio.get("secretary_name") or "Clara"
     studio_name = studio.get("studio_name") or "Estúdio"
     photographer_name = studio.get("photographer_name") or "Gustavo"
     price = studio.get("price") or "450"
     low = user_text.lower().strip()
 
+    # Validação e saneamento do nome (JAMAIS usar termo "Cliente")
+    is_known_name = bool(
+        client_name
+        and client_name.strip()
+        and client_name.strip().lower() not in ["cliente", "cliente teste", "unknown", "none"]
+        and not client_name.strip().startswith("Cliente ")
+    )
+    first_name = client_name.split()[0] if is_known_name else ""
+
+    # Carrega nichos ativos do estúdio
+    active_niches_raw = studio.get('active_niches') or studio.get('niches') or '["gestante", "newborn", "familia"]'
+    try:
+        active_niches = json.loads(active_niches_raw)
+        if isinstance(active_niches, list) and active_niches and isinstance(active_niches[0], str) and "," in active_niches[0]:
+            active_niches = [n.strip() for n in active_niches[0].split(",")]
+    except Exception:
+        active_niches = ["gestante", "newborn", "familia"]
+    if not active_niches:
+        active_niches = ["gestante", "newborn", "familia"]
+
+    niche_names_map = {
+        "gestante": "Gestante",
+        "newborn": "Newborn",
+        "familia": "Família",
+        "casal": "Casal",
+        "casamento": "Casamento",
+        "formatura": "Formatura",
+        "corporativo": "Corporativo"
+    }
+    available_niches_labels = [niche_names_map.get(n.lower(), n.title()) for n in active_niches]
+    niches_formatted = ", ".join(available_niches_labels) if available_niches_labels else "Gestante, Newborn e Família"
+
+    # Opções padrão interativas para menus rápidos
+    interactive_niche_options = [f"📸 {lbl}" for lbl in available_niches_labels[:3]]
+    if len(interactive_niche_options) < 3:
+        interactive_niche_options.append("📅 Ver Horários")
+
     # 1. Pergunta se é robô / IA / bot
     if any(w in low for w in ["robô", "robo", "você é ia", "voce e ia", "assistente virtual", "é um bot", "e um bot"]):
-        reply = f"Sou a {secretary_name}, trabalho aqui no estúdio com o {photographer_name} 😊 Posso te ajudar a ver nossos horários ou tirar dúvidas sobre os ensaios?"
-        return limit_to_one_emoji(reply), None, False
+        reply = f"Sou a {secretary_name}, trabalho aqui no estúdio com o {photographer_name} 😊 Posso te ajudar a ver nossos horários ou tirar dúvidas sobre os ensaios!"
+        return limit_to_one_emoji(reply), None, False, ["Ver Ensaios", "Ver Horários", "Falar com Fotógrafo"]
 
     # 2. Pedido de atendimento com humano / Gustavo / fotógrafo -> WAITING_HUMAN
     wants_human_patterns = [
-        r"\bhumano\b",
-        r"\batendente\b",
-        r"\bpessoa\b",
-        r"\bfalar com\b",
-        r"\bchamar\b",
-        r"\bchama o\b",
-        r"\bfalar com o fotografo\b",
-        r"\bfalar com o fotógrafo\b",
-        r"\bdesconto fora\b",
-        r"\bdesconto maior\b",
-        rf"\b{re.escape(photographer_name.lower())}\b",
+        r"humano",
+        r"atendente",
+        r"pessoa",
+        r"falar com",
+        r"chamar",
+        r"chama o",
+        r"falar com o fotografo",
+        r"falar com o fotógrafo",
+        r"desconto fora",
+        r"desconto maior",
+        rf"{re.escape(photographer_name.lower())}",
     ]
     if any(re.search(pat, low) for pat in wants_human_patterns):
-        # Registra na waiting_queue para monitorar 60 segundos
         now_ts = time.time()
         conn = get_db()
         c = conn.cursor()
@@ -858,36 +1040,42 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
                 stage = 0,
                 message_content = excluded.message_content
             """,
-            (wa_id, studio["id"], client_name, now_ts, now_ts, user_text),
+            (wa_id, studio["id"], client_name if is_known_name else "", now_ts, now_ts, user_text),
         )
         conn.commit()
         conn.close()
 
-        first_n = client_name.split()[0] if client_name else ""
-        reply = f"Com certeza{', ' + first_n if first_n else ''}! Já avisei o {photographer_name} aqui, só 1 minutinho que ele já vem falar com ocê 🙏"
-        return limit_to_one_emoji(reply), None, True
+        vocativo = f", {first_name}" if first_name else ""
+        reply = f"Com certeza{vocativo}! Já avisei o {photographer_name} aqui, só 1 minutinho que ele já vem falar com você 🙏"
+        return limit_to_one_emoji(reply), None, True, []
 
     # 3. Consulta 3 horários reais livres
     ensure_slots_for_studio(studio["id"])
     free_slots = get_three_free_slots(studio["id"])
+    slots_text = ", ".join([s["human"] for s in free_slots])
+    slot_options = [f"📅 {s['human']}" for s in free_slots[:3]]
 
     # 4. Verifica se o cliente escolheu um horário para agendar
     chosen_slot = detect_slot_choice(user_text, free_slots)
     if chosen_slot:
-        comp_id, png_url = book_slot_and_generate_receipt(studio, chosen_slot, wa_id, client_name)
+        niche_detect = "Ensaio Fotográfico"
+        for nk, nlbl in niche_names_map.items():
+            if nk in low or nlbl.lower() in low:
+                niche_detect = f"Ensaio {nlbl}"
+                break
+        chosen_slot["niche"] = niche_detect
+        comp_id, png_url = book_slot_and_generate_receipt(studio, chosen_slot, wa_id, client_name if is_known_name else "")
+        vocativo = f", {first_name}" if first_name else ""
         reply = (
-            f"Prontinho, {client_name}! Reservei {chosen_slot['human']} para você aqui no {studio_name} 📸 "
+            f"Prontinho{vocativo}! Reservei {chosen_slot['human']} para você aqui no {studio_name} 📸 "
             f"Acabei de gerar seu comprovante oficial (#{comp_id.upper()}) e já avisei o {photographer_name}!"
         )
-        # Se reservou, resolve fila humana
         conn = get_db()
         c = conn.cursor()
         c.execute("UPDATE waiting_queue SET status = 'RESOLVED' WHERE client_phone = ?", (wa_id,))
         conn.commit()
         conn.close()
-        return limit_to_one_emoji(reply), png_url, False
-
-    slots_text = ", ".join([s["human"] for s in free_slots])
+        return limit_to_one_emoji(reply), png_url, False, ["Ver Outros Dias", "Tirar Dúvida", "Falar com Fotógrafo"]
 
     # 4b. Se o cliente pediu para ver ensaios / fotos / portfólio / estilos
     ensaio_triggers = [
@@ -895,95 +1083,106 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         "foto", "fotos", "portfólio", "portfolio", "trabalhos", "estilos", "modelos",
         "casal", "gestante", "casamento", "corporativo", "newborn", "família", "familia", "formatura", "exemplo"
     ]
-    if any(re.search(rf"\b{re.escape(w)}\b", low) for w in ensaio_triggers):
-        # 1. Carrega dados de fotos (podem ser lista simples ou dicionário por nicho)
+    if any(re.search(rf"{re.escape(w)}", low) for w in ensaio_triggers):
         raw_photos = studio.get("photos") or "{}"
         photos_by_niche = {}
-        flat_photos = []
         try:
             parsed_photos = json.loads(raw_photos)
-            if isinstance(parsed_photos, list) and parsed_photos and isinstance(parsed_photos[0], str) and parsed_photos[0].startswith(("{", "[")):
-                parsed_photos = json.loads(parsed_photos[0])
-
             if isinstance(parsed_photos, dict):
-                photos_by_niche = parsed_photos
-                for n_k, p_list in photos_by_niche.items():
-                    if isinstance(p_list, list):
-                        flat_photos.extend([p for p in p_list if p and isinstance(p, str) and (p.startswith("http") or p.startswith("/"))])
+                photos_by_niche = ensure_demo_photos(parsed_photos)
             elif isinstance(parsed_photos, list):
-                flat_photos = [p for p in parsed_photos if p and isinstance(p, str) and (p.startswith("http") or p.startswith("/"))]
+                photos_by_niche = ensure_demo_photos({"gestante": parsed_photos})
         except Exception:
-            flat_photos = []
+            photos_by_niche = ensure_demo_photos({})
 
-        # 2. Carrega lista de nichos
-        try:
-            raw_niches = studio.get("niches") or "[]"
-            niches_data = json.loads(raw_niches)
-            if isinstance(niches_data, list) and niches_data and isinstance(niches_data[0], str) and "," in niches_data[0]:
-                niches_list = [n.strip() for n in niches_data[0].split(",")]
-            elif isinstance(niches_data, list):
-                niches_list = niches_data
-            else:
-                niches_list = ["Gestante", "Casal", "Família", "Casamento"]
-            niches_formatted = ", ".join([n.title() for n in niches_list if n])
-        except Exception:
-            niches_list = ["Gestante", "Casal", "Família", "Casamento"]
-            niches_formatted = "Gestante, Casal, Família e Casamento"
-
-        # 3. Detecta se o cliente pediu um nicho específico (ex: gestante, casal, casamento)
         detected_niche = None
-        for n in ["gestante", "casal", "família", "familia", "casamento", "newborn", "formatura", "corporativo"]:
+        for n in ["gestante", "newborn", "família", "familia", "casal", "casamento"]:
             if n in low:
-                detected_niche = n
+                detected_niche = n.replace("í", "i")
                 break
 
         target_photos = []
         if detected_niche and photos_by_niche:
-            for k, p_arr in photos_by_niche.items():
-                if k.lower() == detected_niche or detected_niche in k.lower():
-                    if isinstance(p_arr, list):
-                        target_photos = [p for p in p_arr if p and isinstance(p, str) and (p.startswith("http") or p.startswith("/"))]
-                    break
+            target_photos = photos_by_niche.get(detected_niche) or []
 
         if not target_photos:
-            target_photos = flat_photos
+            first_niche_key = active_niches[0].lower().replace("í", "i") if active_niches else "gestante"
+            target_photos = photos_by_niche.get(first_niche_key) or []
 
         if target_photos:
-            nicho_label = detected_niche.title() if detected_niche else niches_formatted
+            nicho_label = niche_names_map.get(detected_niche, detected_niche.title()) if detected_niche else niches_formatted
             for idx, p_url in enumerate(target_photos[:3], 1):
                 send_whatsapp_message(studio, wa_id, f"Exemplo {idx}/{min(len(target_photos), 3)} - {nicho_label} • {studio_name}", image_url=p_url)
             reply = (
                 f"Acabei de te mandar fotos de exemplo dos nossos trabalhos de {nicho_label} aqui no {studio_name} 📸 "
-                f"Nossos ensaios começam em R$ {price}. Tenho estes horários livres: {slots_text}. Qual deles fica melhor pra ocê?"
+                f"Nossos ensaios começam em R$ {price}. Tenho estes horários livres: {slots_text}. Qual deles fica melhor para você?"
             )
+            return limit_to_one_emoji(reply), target_photos[0], False, slot_options
         else:
-            nicho_msg = f"de {detected_niche.title()}" if detected_niche else f"de {niches_formatted}"
             reply = (
-                f"Aqui no {studio_name} nós fazemos ensaios lindos {nicho_msg}! ✨ "
-                f"O {photographer_name} está atualizando as fotos da nossa galeria e logo vou te mandar fotos novinhas por aqui. "
+                f"Aqui no {studio_name} nós fazemos ensaios lindos de {niches_formatted}! ✨ "
                 f"Nossos pacotes começam a partir de R$ {price}. Tenho livres: {slots_text}. Gostaria de garantir um desses horários?"
             )
-        return limit_to_one_emoji(reply), None, False
+            return limit_to_one_emoji(reply), None, False, slot_options
 
     # 4c. Se o cliente perguntou especificamente sobre preço ou valores
     if any(w in low for w in ["quanto custa", "valor", "valores", "preço", "preco", "tabela", "pacote", "pacotes"]):
         reply = (
             f"Nossos pacotes de ensaio aqui no {studio_name} começam em R$ {price} e incluem as fotos editadas em alta resolução ✨ "
-            f"Temos horários livres: {slots_text}. Quer que eu reserve algum pra ocê?"
+            f"Temos horários livres: {slots_text}. Quer que eu reserve algum para você?"
         )
-        return limit_to_one_emoji(reply), None, False
+        return limit_to_one_emoji(reply), None, False, slot_options
 
     # 4d. Se o cliente perguntou sobre horários / datas / disponibilidade
-    if any(w in low for w in ["horário", "horario", "datas", "quando tem", "agenda", "disponibilidade", "já tenho horário", "ja tenho horario"]):
-        reply = f"Tenho estas 3 opções mais próximas no momento: {slots_text}. Qual delas fica melhor pra ocê?"
-        return limit_to_one_emoji(reply), None, False
+    if any(w in low for w in ["horário", "horario", "datas", "quando tem", "agenda", "disponibilidade"]):
+        reply = f"Tenho estas 3 opções mais próximas no momento: {slots_text}. Qual delas fica melhor para você?"
+        return limit_to_one_emoji(reply), None, False, slot_options
 
-    # 4e. Cumprimentos e Saudações amigáveis (sem despejar preço de imediato!)
+    # 4e. Saudação Contextual Espelhada e Humanizada (sem jargão nem vocativo 'Cliente')
     if any(w in low for w in ["oi", "ola", "olá", "bom dia", "boa tarde", "boa noite", "opa", "oie", "tudo bem", "td bem"]):
-        first_n = client_name.split()[0] if client_name else ""
-        greeting = f"Oi{', ' + first_n if first_n else ''}! Aqui é a {secretary_name}, do {studio_name} 😊 "
-        greeting += f"O {photographer_name} tá em sessão de fotos agora, mas eu posso te ajudar! Você gostaria de conhecer nossos ensaios ou consultar as datas livres?"
-        return limit_to_one_emoji(greeting), None, False
+        current_hour = now_sp().hour
+        if "bom dia" in low:
+            saudacao_tempo = "Bom dia! ☀️ Tudo bem com você?"
+        elif "boa tarde" in low:
+            saudacao_tempo = "Boa tarde! ✨ Tudo ótimo por aqui, e com você?"
+        elif "boa noite" in low:
+            saudacao_tempo = "Boa noite! 🌙 Tudo bem?"
+        else:
+            if current_hour < 12:
+                saudacao_tempo = "Bom dia! ☀️ Tudo bem com você?"
+            elif current_hour < 18:
+                saudacao_tempo = "Boa tarde! ✨ Tudo ótimo por aqui, e com você?"
+            else:
+                saudacao_tempo = "Boa noite! 🌙 Tudo bem?"
+
+        if is_known_name:
+            greeting = f"{saudacao_tempo} Aqui é a {secretary_name}, do {studio_name} 😊 "
+            greeting += f"O {photographer_name} tá em estúdio agora, mas posso te atender! Você gostaria de conhecer nossos ensaios ({niches_formatted}) ou consultar as datas livres?"
+        else:
+            greeting = f"{saudacao_tempo} Aqui é a {secretary_name}, do {studio_name} 😊 "
+            greeting += f"Como posso te chamar? Posso te apresentar nossos ensaios ({niches_formatted}) ou consultar os horários livres na agenda!"
+
+        return limit_to_one_emoji(greeting), None, False, interactive_niche_options
+
+    # 4f. Se o usuário enviou o nome dele (resposta a 'Como posso te chamar?')
+    words = user_text.strip().split()
+    if not is_known_name and len(words) <= 3 and not any(w in low for w in ["ensaio", "foto", "preço", "horário", "dia", "sim", "não"]):
+        clean_cand = " ".join([w.capitalize() for w in words if w.isalpha()])
+        if clean_cand:
+            try:
+                conn = get_db()
+                c = conn.cursor()
+                c.execute("UPDATE messages SET client_name = ? WHERE wa_id = ?", (clean_cand, wa_id))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            first_name = clean_cand.split()[0]
+            reply = (
+                f"Prazer em te conhecer, {first_name}! 📸 "
+                f"Aqui no {studio_name} trabalhamos com {niches_formatted}. Quer dar uma olhada nas fotos de exemplo ou ver os dias livres na nossa agenda?"
+            )
+            return limit_to_one_emoji(reply), None, False, interactive_niche_options
 
     # 5. Chama Gemini 1.5 Flash com histórico recente e prompt humanizado
     system_prompt = build_system_prompt(studio, free_slots)
@@ -999,40 +1198,37 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             history_rows = list(reversed(c.fetchall()))
             conn.close()
             hist_lines = [
-                f"{'Cliente' if r['direction'] == 'in' else secretary_name}: {r['content']}"
+                f"{(first_name or 'Visitante') if r['direction'] == 'in' else secretary_name}: {r['content']}"
                 for r in history_rows
             ]
             full_prompt = (
                 f"{system_prompt}\n\n"
                 f"Histórico recente:\n" + "\n".join(hist_lines) + "\n\n"
-                f"Cliente ({client_name}): {user_text}\n"
-                f"Responda como {secretary_name} (curta, calorosa, máx 1 emoji, oferecendo os 3 horários livres: {slots_text}):"
+                f"Pessoa ({first_name or 'Nome ainda não informado'}): {user_text}\n"
+                f"Responda como {secretary_name} (curta, calorosa, máx 1 emoji, NUNCA chame de 'Cliente', se não souber o nome pergunte gentilmente como pode chamar, oferecendo opções: {niches_formatted} ou horários: {slots_text}):"
             )
             resp = genai_model.generate_content(full_prompt)
             if resp and resp.text:
                 cleaned = sanitize_ai_phrases(resp.text.strip(), secretary_name)
-                return cleaned, None, False
+                return cleaned, None, False, interactive_niche_options
         except Exception as e:
             logger.warning("Gemini generation fallback: %s", e)
 
     # Fallback contextual inteligente caso Gemini API Key não esteja definida
-    first_n = client_name.split()[0] if client_name else ""
+    vocativo = f", {first_name}" if first_name else ""
     if len(user_text.strip().split()) <= 2:
         reply = (
-            f"Oi{', ' + first_n if first_n else ''}! Como posso te ajudar hoje aqui no {studio_name}? "
-            f"Se quiser conhecer nossos ensaios ou ver as datas disponíveis, é só me falar ✨"
+            f"Oi{vocativo}! Como posso te ajudar hoje aqui no {studio_name}? "
+            f"Se quiser conhecer nossos ensaios de {niches_formatted} ou ver as datas disponíveis, é só me falar ✨"
         )
     else:
         reply = (
-            f"Oi{', ' + first_n if first_n else ''}! Entendi certinho. Aqui no {studio_name} temos ensaios a partir de R$ {price} "
-            f"e nossos próximos horários livres são: {slots_text}. Qual opção fica melhor pra você?"
+            f"Oi{vocativo}! Entendi perfeitamente. Aqui no {studio_name} temos ensaios a partir de R$ {price} "
+            f"e nossos próximos horários livres são: {slots_text}. Qual opção fica melhor para você?"
         )
-    return limit_to_one_emoji(reply), None, False
+    return limit_to_one_emoji(reply), None, False, interactive_niche_options
 
 
-# ==============================================================================
-# FOLLOW-UP INTELIGENTE DE 30H (APSCHEDULER A CADA 1H)
-# ==============================================================================
 def analyze_reengagement_with_gemini(history_text: str) -> tuple[bool, str]:
     """Envia histórico pro Gemini: 'Vale a pena reengajar? Responda SIM ou NAO e motivo'."""
     prompt = (
@@ -1403,45 +1599,87 @@ def auth_callback():
     # Criptografa o access_token com Fernet antes de salvar no SQLite
     encrypted_token = encrypt_value(long_lived_token)
 
+    dash_token = studio.get("dashboard_token") or str(uuid.uuid4())
     conn = get_db()
     c = conn.cursor()
     c.execute(
         """
         UPDATE studios
-        SET waba_id = ?, phone_number_id = ?, access_token = ?, status = 'ACTIVE'
+        SET waba_id = ?, phone_number_id = ?, access_token = ?, status = 'configurando', dashboard_token = ?
         WHERE id = ?
         """,
-        (waba_id, phone_number_id, encrypted_token, studio["id"]),
+        (waba_id, phone_number_id, encrypted_token, dash_token, studio["id"]),
     )
     conn.commit()
     conn.close()
 
-    return redirect(f"/onboarding?studio_id={studio['id']}")
+    # Redireciona com token único diretamente para /configurar-estudio (ou /onboarding como alias compatível)
+    redirect_target = f"/onboarding?token={dash_token}&studio_id={studio['id']}"
+    if request.is_json or (request.headers.get("Accept") and "application/json" in request.headers.get("Accept")):
+        return jsonify({"ok": True, "redirect_url": redirect_target})
+    return redirect(redirect_target)
 
 
+@app.route("/configurar-estudio", methods=["GET", "POST"])
 @app.route("/onboarding", methods=["GET", "POST"])
 def page_onboarding():
+    """
+    Configuração do Estúdio com validação de token, upload categorizado por nicho
+    (Gestante, Newborn, Família) e compatibilidade total com o formulário clássico.
+    """
+    token = request.args.get("token") or request.args.get("acesso")
     studio_id = request.args.get("studio_id") or request.form.get("studio_id")
-    studio = get_active_studio(studio_id)
+    studio = None
+
+    if token:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+        r = c.fetchone()
+        conn.close()
+        if r:
+            studio = dict(r)
+
+    if not studio:
+        studio = get_active_studio(studio_id)
+
+    if not studio:
+        abort(403)
+
+    # Se rota /configurar-estudio for chamada sem token válido, retorna 403
+    if request.path == "/configurar-estudio" and not token and not studio.get("dashboard_token"):
+        abort(403)
+
     saved = False
 
     if request.method == "POST":
         studio_name = clean_input(request.form.get("studio_name") or studio.get("studio_name"), 50)
         photographer_name = clean_input(request.form.get("photographer_name") or studio.get("photographer_name"), 50)
         secretary_name = clean_input(request.form.get("secretary_name") or studio.get("secretary_name"), 50)
-        price = clean_input(request.form.get("price") or studio.get("price"), 20)
+        price = clean_input(request.form.get("price") or studio.get("price"), 120)
         ig_keywords = clean_input(request.form.get("ig_keywords") or studio.get("ig_keywords") or "preço, valor, quanto, quero, info, ensaio, lindo", 200)
         niches_list = request.form.getlist("niches")
         if not niches_list:
-            niches_list = ["gestante", "casamento", "ensaio", "corporativo"]
+            niches_list = ["gestante", "newborn", "familia"]
+
         photos_raw = request.form.get("photos") or "{}"
         try:
             parsed_test = json.loads(photos_raw)
-            photos_json = json.dumps(parsed_test, ensure_ascii=False)
+            if isinstance(parsed_test, dict):
+                processed_photos = process_niche_photos(parsed_test)
+                photos_json = json.dumps(processed_photos, ensure_ascii=False)
+            else:
+                photos_json = json.dumps(parsed_test, ensure_ascii=False)
         except Exception:
             photos_json = photos_raw
 
         consent_lgpd = 1 if request.form.get("consent_lgpd") else 0
+        consent_ip = (
+        request.headers.get("CF-Connecting-IP")
+        or (request.headers.get("X-Forwarded-For").split(",")[0].strip() if request.headers.get("X-Forwarded-For") else None)
+        or request.remote_addr
+        or "127.0.0.1"
+    )
 
         conn = get_db()
         c = conn.cursor()
@@ -1449,7 +1687,7 @@ def page_onboarding():
             """
             UPDATE studios
             SET studio_name = ?, photographer_name = ?, secretary_name = ?,
-                niches = ?, price = ?, photos = ?, consent_lgpd = ?, ig_keywords = ?, status = 'ACTIVE'
+                niches = ?, price = ?, photos = ?, consent_lgpd = ?, consent_ip = ?, ig_keywords = ?, status = 'active'
             WHERE id = ?
             """,
             (
@@ -1460,6 +1698,7 @@ def page_onboarding():
                 price,
                 photos_json,
                 consent_lgpd,
+                consent_ip,
                 ig_keywords,
                 studio["id"],
             ),
@@ -1471,7 +1710,7 @@ def page_onboarding():
                     studio["id"],
                     "CONSENT_ACCEPTED_ONBOARDING",
                     now_iso(),
-                    request.remote_addr or "127.0.0.1",
+                    consent_ip,
                 ),
             )
         conn.commit()
@@ -1479,6 +1718,36 @@ def page_onboarding():
         ensure_slots_for_studio(studio["id"])
         studio = get_active_studio(studio["id"])
         saved = True
+
+        if request.is_json or (request.headers.get("Accept") and "application/json" in request.headers.get("Accept")):
+            return jsonify({"ok": True, "redirect_url": f"/meu-estudio?token={studio.get('dashboard_token')}"})
+
+    # Parse de fotos por nicho garantindo demo_photos caso vazio
+    photos_by_niche = {"gestante": [], "newborn": [], "familia": []}
+    try:
+        raw_p = studio.get("photos") or "{}"
+        parsed_p = json.loads(raw_p)
+        if isinstance(parsed_p, list) and parsed_p and isinstance(parsed_p[0], str) and parsed_p[0].startswith(("{", "[")):
+            parsed_p = json.loads(parsed_p[0])
+        if isinstance(parsed_p, dict):
+            photos_by_niche = ensure_demo_photos(parsed_p)
+        elif isinstance(parsed_p, list):
+            photos_by_niche = ensure_demo_photos({"gestante": parsed_p})
+        else:
+            photos_by_niche = ensure_demo_photos({})
+    except Exception:
+        photos_by_niche = ensure_demo_photos({})
+
+    # Carrega nichos ativos (default: ["gestante", "newborn", "familia"])
+    raw_an = studio.get('active_niches') or '["gestante", "newborn", "familia"]'
+    try:
+        active_niches = json.loads(raw_an)
+        if isinstance(active_niches, list) and active_niches and isinstance(active_niches[0], str) and "," in active_niches[0]:
+            active_niches = [n.strip() for n in active_niches[0].split(",")]
+    except Exception:
+        active_niches = ["gestante", "newborn", "familia"]
+    if not active_niches:
+        active_niches = ["gestante", "newborn", "familia"]
 
     try:
         raw_n = studio.get("niches") or "[]"
@@ -1488,29 +1757,17 @@ def page_onboarding():
         elif isinstance(parsed_n, list):
             selected_niches = parsed_n
         else:
-            selected_niches = ["gestante", "casamento", "ensaio"]
+            selected_niches = ["gestante", "newborn", "familia"]
     except Exception:
-        selected_niches = ["gestante", "casamento", "ensaio"]
+        selected_niches = ["gestante", "newborn", "familia"]
 
-    photos_by_niche = {}
-    try:
-        raw_p = studio.get("photos") or "{}"
-        parsed_p = json.loads(raw_p)
-        if isinstance(parsed_p, list) and parsed_p and isinstance(parsed_p[0], str) and parsed_p[0].startswith(("{", "[")):
-            parsed_p = json.loads(parsed_p[0])
-        if isinstance(parsed_p, dict):
-            photos_by_niche = parsed_p
-        elif isinstance(parsed_p, list):
-            # Se for lista antiga de fotos gerais, atribui ao primeiro nicho
-            primeiro_nicho = selected_niches[0] if selected_niches else "geral"
-            photos_by_niche[primeiro_nicho] = parsed_p
-    except Exception:
-        photos_by_niche = {}
-
+    # Se a chamada foi explicitamente para /configurar-estudio, renderiza o template com os 3 blocos
+    template_name = "configurar_estudio.html" if request.path == "/configurar-estudio" else "onboarding.html"
     return render_template(
-        "onboarding.html",
+        template_name,
         studio=studio,
         selected_niches=selected_niches,
+        active_niches=active_niches,
         photos_by_niche=photos_by_niche,
         photos=json.dumps(photos_by_niche, ensure_ascii=False),
         saved=saved,
@@ -1518,10 +1775,154 @@ def page_onboarding():
     )
 
 
+@app.route("/api/ativar-estudio", methods=["POST"])
+def api_ativar_estudio():
+    """
+    Endpoint JSON para ativar estúdio: recebe dados do onboarding/configuração,
+    valida LGPD, comprime imagens base64 via Pillow (máx 800px, 70% quality),
+    atualiza status para 'active' e retorna redirect_url para /painel?token=...
+    """
+    data = request.get_json(silent=True) or request.form or {}
+    token = data.get("token") or request.args.get("token")
+    if not token:
+        return jsonify({"ok": False, "error": "Token de autenticação obrigatório"}), 403
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Estúdio não encontrado para o token fornecido"}), 403
+
+    studio = dict(row)
+    studio_name = clean_input(data.get("studio_name") or studio.get("studio_name"), 50)
+    photographer_name = clean_input(data.get("photographer_name") or studio.get("photographer_name"), 50)
+    secretary_name = clean_input(data.get("secretary_name") or studio.get("secretary_name"), 50)
+    price = clean_input(data.get("price") or studio.get("price"), 120)
+
+    # Processamento de fotos categorizadas com Pillow (800px, qualidade 70)
+    incoming_photos = data.get("photos") or {}
+    if isinstance(incoming_photos, str):
+        try:
+            incoming_photos = json.loads(incoming_photos)
+        except Exception:
+            incoming_photos = {}
+
+    processed_photos = process_niche_photos(incoming_photos)
+    photos_json = json.dumps(processed_photos, ensure_ascii=False)
+
+    consent_lgpd = 1 if (data.get("consent_lgpd") or data.get("consent_lgpd") == "1") else 0
+    consent_ip = (
+        request.headers.get("CF-Connecting-IP")
+        or (request.headers.get("X-Forwarded-For").split(",")[0].strip() if request.headers.get("X-Forwarded-For") else None)
+        or request.remote_addr
+        or "127.0.0.1"
+    )
+
+    active_niches_raw = data.get("active_niches")
+    if active_niches_raw:
+        if isinstance(active_niches_raw, str):
+            try:
+                active_niches_list = json.loads(active_niches_raw)
+            except Exception:
+                active_niches_list = [n.strip() for n in active_niches_raw.split(",") if n.strip()]
+        elif isinstance(active_niches_raw, list):
+            active_niches_list = active_niches_raw
+        else:
+            active_niches_list = ["gestante", "newborn", "familia"]
+    else:
+        active_niches_list = ["gestante", "newborn", "familia"]
+
+    if not active_niches_list:
+        active_niches_list = ["gestante", "newborn", "familia"]
+
+    # Garante que nenhum nicho fique sem fotos (aplica demo se vazio)
+    processed_photos = ensure_demo_photos(processed_photos)
+    photos_json = json.dumps(processed_photos, ensure_ascii=False)
+
+    c.execute(
+        """
+        UPDATE studios
+        SET studio_name = ?, photographer_name = ?, secretary_name = ?,
+            price = ?, photos = ?, niches = ?, active_niches = ?, consent_lgpd = ?, consent_ip = ?, status = 'active'
+        WHERE id = ?
+        """,
+        (
+            studio_name,
+            photographer_name,
+            secretary_name,
+            price,
+            photos_json,
+            json.dumps(active_niches_list, ensure_ascii=False),
+            json.dumps(active_niches_list, ensure_ascii=False),
+            consent_lgpd,
+            consent_ip,
+            studio["id"],
+        ),
+    )
+
+    if consent_lgpd:
+        c.execute(
+            "INSERT INTO consent_log (studio_id, action, timestamp, ip) VALUES (?, ?, ?, ?)",
+            (studio["id"], "CONSENT_ACCEPTED_API_ATIVAR", now_iso(), consent_ip),
+        )
+
+    conn.commit()
+    conn.close()
+
+    ensure_slots_for_studio(studio["id"])
+    return jsonify({
+        "ok": True,
+        "status": "active",
+        "redirect_url": f"/painel?token={token}"
+    })
+
+
+@app.route("/meu-estudio")
+def page_meu_estudio():
+    """
+    Página de resumo Meu Estúdio mostrando os dados configurados e galeria 3x3
+    com botão direto 'ATIVAR E IR PARA PAINEL PRINCIPAL ->'.
+    """
+    token = request.args.get("token") or request.args.get("acesso")
+    if not token:
+        abort(403)
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        abort(403)
+
+    studio = dict(row)
+    photos_by_niche = ensure_demo_photos({})
+    try:
+        raw_p = studio.get("photos") or "{}"
+        parsed = json.loads(raw_p)
+        if isinstance(parsed, dict):
+            photos_by_niche = ensure_demo_photos(parsed)
+        elif isinstance(parsed, list):
+            photos_by_niche = ensure_demo_photos({"gestante": parsed})
+    except Exception:
+        pass
+
+    return render_template(
+        "meu_estudio.html",
+        studio=studio,
+        photos_by_niche=photos_by_niche,
+        dashboard_url=build_dashboard_url(studio),
+    )
+
+
+@app.route("/painel")
 @app.route("/dashboard")
 def page_dashboard():
     """
     Painel do Fotógrafo protegido por token único por estúdio (?token=... ou ?acesso=...).
+    Oferece 3 abas unificadas: Conversas ao Vivo, Central de Agendamentos e Meu Estúdio.
     Sem o token válido, retorna 403 Forbidden.
     """
     provided_token = request.args.get("token") or request.args.get("acesso")
@@ -1537,6 +1938,7 @@ def page_dashboard():
         abort(403)
 
     studio = dict(st_row)
+    studio["dashboard_chave"] = (studio.get("dashboard_token") or "").replace("token", "chave")
     studio_id = studio["id"]
 
     # Métricas do dia
@@ -1561,12 +1963,17 @@ def page_dashboard():
     conversion_rate = min(100, int(round((booked_count / total_leads) * 100)))
 
     c.execute(
-        "SELECT * FROM slots WHERE studio_id = ? AND status = 'booked' ORDER BY start_at ASC LIMIT 20",
+        "SELECT id, studio_id, start_at, end_at, status, client_wa_id, client_name, comprovante_id, niche, receipt_path FROM slots WHERE studio_id = ? AND status = 'booked' ORDER BY start_at ASC LIMIT 40",
         (studio_id,),
     )
     booked_slots = [dict(r) for r in c.fetchall()]
     for b in booked_slots:
+        b["raw_start_at"] = b.get("start_at") or ""
         b["start_at"] = format_slot_human(b["start_at"])
+        if not b.get("niche"):
+            b["niche"] = "Ensaio Geral"
+        if not b.get("receipt_path") and b.get("comprovante_id"):
+            b["receipt_path"] = f"/static/comprovantes/{b['comprovante_id']}.png"
 
     ensure_slots_for_studio(studio_id, conn=conn)
     c.execute(
@@ -1612,6 +2019,18 @@ def page_dashboard():
     for ie in ig_recent_events:
         ie["formatted_time"] = datetime.fromtimestamp(ie["timestamp"]).strftime("%d/%m %H:%M") if ie.get("timestamp") else ""
 
+    # Prepara fotos por nicho para a aba 'Meu Estúdio' dentro do painel com fallback demo
+    photos_by_niche = ensure_demo_photos({})
+    try:
+        raw_p = studio.get("photos") or "{}"
+        parsed = json.loads(raw_p)
+        if isinstance(parsed, dict):
+            photos_by_niche = ensure_demo_photos(parsed)
+        elif isinstance(parsed, list):
+            photos_by_niche = ensure_demo_photos({"gestante": parsed})
+    except Exception:
+        pass
+
     conn.close()
 
     return render_template(
@@ -1631,11 +2050,82 @@ def page_dashboard():
         waiting_list=waiting_list,
         booked_slots=booked_slots,
         free_slots=free_slots,
+        photos_by_niche=photos_by_niche,
         recent_messages=conversations,
         ig_comments=ig_comments,
         ig_waiting=ig_waiting,
         ig_recent_events=ig_recent_events,
     )
+
+
+@app.route("/agendamentos/<int:slot_id>/cancelar", methods=["POST"])
+@app.route("/api/agendamentos/<int:slot_id>/cancelar", methods=["POST"])
+def api_cancelar_agendamento(slot_id: int):
+    """
+    Cancela/desmarca um agendamento liberando o horário para novos clientes.
+    Exige autenticação por token do estúdio.
+    """
+    token = request.args.get("acesso") or request.args.get("token") or (request.get_json(silent=True) or {}).get("acesso") or (request.get_json(silent=True) or {}).get("token")
+    if not token:
+        return jsonify({"ok": False, "error": "Token de autorização obrigatório"}), 403
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+    st_row = c.fetchone()
+    if not st_row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Token inválido"}), 403
+
+    studio = dict(st_row)
+    c.execute("SELECT * FROM slots WHERE id = ? AND studio_id = ?", (slot_id, studio["id"]))
+    slot_row = c.fetchone()
+    if not slot_row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Agendamento não encontrado"}), 404
+
+    # Captura dados da reserva antes de liberar
+    slot_dict = dict(slot_row)
+    client_wa_id = slot_dict.get("client_wa_id") or ""
+    raw_client_name = slot_dict.get("client_name") or ""
+    slot_niche = slot_dict.get("niche") or "Ensaio"
+    slot_start = slot_dict.get("start_at") or ""
+    slot_human_date = format_slot_human(slot_start) if slot_start else "agendado"
+
+    clean_name = raw_client_name.strip() if (raw_client_name and raw_client_name.strip().lower() not in ["cliente", "none"]) else ""
+    nome_se_houver = f", {clean_name.split()[0]}" if clean_name else ""
+
+    # Libera o slot imediatamente
+    c.execute(
+        """
+        UPDATE slots
+        SET status = 'free', client_wa_id = NULL, client_name = NULL, comprovante_id = NULL, receipt_path = NULL
+        WHERE id = ? AND studio_id = ?
+        """,
+        (slot_id, studio["id"]),
+    )
+    conn.commit()
+
+    # Dispara notificação humanizada ao cliente
+    notif_msg = (
+        f"Olá{nome_se_houver}! Passando para confirmar que o seu agendamento de ensaio ({slot_niche}) "
+        f"do dia {slot_human_date} foi desmarcado conforme solicitado. Se quiser escolher uma nova data, é só me chamar por aqui! ✨"
+    )
+
+    if client_wa_id:
+        c.execute(
+            """
+            INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status)
+            VALUES (?, ?, 'out', ?, ?, 'sent')
+            """,
+            (studio["id"], client_wa_id, notif_msg, now_iso()),
+        )
+        conn.commit()
+        send_whatsapp_message(studio, client_wa_id, notif_msg)
+
+    conn.close()
+    logger.info("SLOT_CANCELLED: Agendamento slot_id=%d desmarcado e notificação enviada para %s", slot_id, mask_wa_id(client_wa_id))
+    return jsonify({"ok": True, "slot_id": slot_id, "status": "free", "notified": bool(client_wa_id)})
 
 
 @app.route("/dashboard/status", methods=["POST"])
@@ -1703,12 +2193,21 @@ def dashboard_simular_conversa():
     )
     conn.commit()
 
-    reply_text, receipt_url, waiting_human = generate_humanized_reply(studio, wa_id, client_name, user_text)
+    res = generate_humanized_reply(studio, wa_id, client_name, user_text)
+    if len(res) == 4:
+        reply_text, receipt_url, waiting_human, options = res
+    else:
+        reply_text, receipt_url, waiting_human = res
+        options = []
+
     if waiting_human:
         c.execute("UPDATE studios SET status = 'WAITING_HUMAN' WHERE id = ?", (studio["id"],))
 
     c.execute(
-        "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status) VALUES (?, ?, 'out', ?, ?, 'sent')",
+        """
+        INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status)
+        VALUES (?, ?, 'out', ?, ?, 'sent')
+        """,
         (studio["id"], wa_id, reply_text, now_iso()),
     )
     conn.commit()
@@ -1720,8 +2219,44 @@ def dashboard_simular_conversa():
             "reply": reply_text,
             "receipt_url": receipt_url,
             "waiting_human": waiting_human,
+            "options": options or [],
         }
     )
+
+
+@app.route("/chat-teste/reset", methods=["POST"])
+@app.route("/api/chat-teste/reset", methods=["POST"])
+def api_chat_teste_reset():
+    """
+    Limpa o histórico de mensagens de teste (wa_id = 5534999990000) daquele estúdio,
+    reseta travas de WAITING_HUMAN ou estados pendentes e recarrega a janela limpa.
+    """
+    token = request.args.get("acesso") or request.args.get("token") or (request.get_json(silent=True) or {}).get("acesso") or (request.get_json(silent=True) or {}).get("token")
+    if not token:
+        return jsonify({"ok": False, "error": "Token obrigatório"}), 403
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+    st_row = c.fetchone()
+    if not st_row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Token inválido"}), 403
+
+    studio = dict(st_row)
+    test_wa_id = "5534999990000"
+
+    # Remove mensagens de teste
+    c.execute("DELETE FROM messages WHERE studio_id = ? AND wa_id = ?", (studio["id"], test_wa_id))
+    # Remove da fila de espera humana
+    c.execute("DELETE FROM waiting_queue WHERE client_phone = ?", (test_wa_id,))
+    # Restaura status do estúdio para ACTIVE
+    c.execute("UPDATE studios SET status = 'active' WHERE id = ?", (studio["id"],))
+
+    conn.commit()
+    conn.close()
+    logger.info("CHAT_TEST_RESET: Histórico de chat de teste resetado com sucesso para estúdio %s", studio["id"])
+    return jsonify({"ok": True, "message": "Histórico de teste resetado"})
 
 
 @app.route("/instalar")
@@ -1957,9 +2492,13 @@ def webhook():
         )
         conn.commit()
 
-        reply_text, receipt_url, set_waiting_human = generate_humanized_reply(
-            studio, wa_id, item.get("client_name") or "Cliente", user_text
+        gen_res = generate_humanized_reply(
+            studio, wa_id, item.get("client_name") or "", user_text
         )
+        if len(gen_res) == 4:
+            reply_text, receipt_url, set_waiting_human, _ = gen_res
+        else:
+            reply_text, receipt_url, set_waiting_human = gen_res
 
         c.execute(
             """

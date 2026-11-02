@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meu Estúdio — Bot do Studio</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --card: #202c33;
+      --green: #25D366;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --border: #2a3942;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; display: flex; flex-direction: column; gap: 20px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    h1 { font-size: 24px; font-weight: 800; color: #fff; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .summary-item {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .summary-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .summary-val { font-size: 16px; font-weight: 800; color: #fff; margin-top: 4px; }
+    .niche-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 600px) {
+      .gallery-grid { grid-template-columns: 1fr; }
+    }
+    .gallery-img-box {
+      height: 140px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+    }
+    .gallery-img-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .empty-slot {
+      height: 140px;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+    .btn-action {
+      background: #25D366;
+      color: #111b21;
+      font-size: 18px;
+      font-weight: 900;
+      padding: 18px;
+      border-radius: 14px;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      text-align: center;
+      box-shadow: 0 8px 25px rgba(37, 211, 102, 0.35);
+      transition: background 0.2s;
+    }
+    .btn-action:hover { background: #1ebd5b; }
+    .btn-edit {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      text-align: center;
+      display: block;
+    }
+    .btn-edit:hover { color: #fff; border-color: var(--green); }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/comecar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio</span>
+    </a>
+    <nav>
+      <a href="/comecar">🚀 Começar</a>
+      <a href="{{ dashboard_url }}">📋 Painel</a>
+      <a href="/meu-estudio?token={{ studio.dashboard_token }}" class="active">📸 Meu Estúdio</a>
+      <a href="/instalar">📲 Instalar App</a>
+      <a href="/ajuda">❓ Ajuda</a>
+      <a href="/privacidade">🔒 Privacidade</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <span style="background: rgba(37,211,102,0.15); color: var(--green); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 800;">
+            ✓ ESTÚDIO PRONTO PARA ATENDIMENTO
+          </span>
+          <h1 style="margin-top: 8px;">{{ studio.studio_name }}</h1>
+        </div>
+        <a href="/configurar-estudio?token={{ studio.dashboard_token }}" class="btn-edit" style="width: auto; padding: 8px 14px;">
+          ✏️ Editar Dados
+        </a>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-label">Fotógrafo Responsável</div>
+          <div class="summary-val">{{ studio.photographer_name }}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Secretária Virtual IA</div>
+          <div class="summary-val" style="color: var(--green);">{{ studio.secretary_name }}</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Valores de Ensaio</div>
+          <div class="summary-val">{{ studio.price }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Portfólio Ativo no WhatsApp (3 Fotos por Nicho)</h2>
+      <p style="color: var(--muted); font-size: 13.5px;">
+        Sua secretária virtual {{ studio.secretary_name }} envia essas fotos automaticamente para os clientes quando eles perguntam sobre cada ensaio:
+      </p>
+
+      <!-- Gestante -->
+      <div class="niche-section">
+        <strong style="color: #fff; font-size: 14.5px;">🤰 Ensaio Gestante</strong>
+        <div class="gallery-grid">
+          {% for img in photos_by_niche.get('gestante', [])[:3] %}
+            <div class="gallery-img-box"><img src="{{ img }}" alt="Foto Gestante" /></div>
+          {% else %}
+            <div class="empty-slot">Sem fotos cadastradas</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Newborn -->
+      <div class="niche-section">
+        <strong style="color: #fff; font-size: 14.5px;">👶 Ensaio Newborn</strong>
+        <div class="gallery-grid">
+          {% for img in photos_by_niche.get('newborn', [])[:3] %}
+            <div class="gallery-img-box"><img src="{{ img }}" alt="Foto Newborn" /></div>
+          {% else %}
+            <div class="empty-slot">Sem fotos cadastradas</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Família -->
+      <div class="niche-section">
+        <strong style="color: #fff; font-size: 14.5px;">👨‍👩‍👧 Ensaio Família</strong>
+        <div class="gallery-grid">
+          {% for img in photos_by_niche.get('familia', [])[:3] %}
+            <div class="gallery-img-box"><img src="{{ img }}" alt="Foto Família" /></div>
+          {% else %}
+            <div class="empty-slot">Sem fotos cadastradas</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+      <a href="/painel?token={{ studio.dashboard_token }}" class="btn-action">
+        ATIVAR E IR PARA O PAINEL PRINCIPAL →
+      </a>
+      <a href="/configurar-estudio?token={{ studio.dashboard_token }}" class="btn-edit">
+        ← Voltar e Ajustar Informações
+      </a>
+    </div>
+  </main>
+</body>
+</html>

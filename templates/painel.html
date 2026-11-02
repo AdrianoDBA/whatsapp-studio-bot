@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel do Estúdio — Bot do Studio</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --card: #202c33;
+      --green: #25D366;
+      --green-dark: #1ebd5b;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --border: #2a3942;
+      --danger: #ea4335;
+      --danger-hover: #d93025;
+      --warn: #fbbc04;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    nav a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 80px; display: flex; flex-direction: column; gap: 18px; }
+    
+    .status-bar {
+      background: var(--card);
+      border: 2px solid var(--green);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .badge-active { background: rgba(37, 211, 102, 0.18); color: var(--green); border: 1px solid var(--green); }
+    .badge-paused { background: rgba(234, 67, 53, 0.2); color: #ff8a80; border: 1px solid #ea4335; }
+    .badge-human { background: rgba(251, 188, 4, 0.2); color: var(--warn); border: 1px solid var(--warn); }
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.7; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.7; }
+    }
+
+    .tab-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14.5px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab-btn.active-tab {
+      background: var(--card);
+      color: #fff;
+      border-color: var(--green);
+    }
+    .tab-pane { display: none; flex-direction: column; gap: 18px; }
+    .tab-pane.active-pane { display: flex; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .metric-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .metric-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .metric-value { font-size: 26px; font-weight: 900; color: var(--green); margin-top: 4px; }
+
+    .columns-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .col-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 440px;
+    }
+    .col-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .item-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      padding: 9px 14px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .btn-green { background: var(--green); color: #111b21; }
+    .btn-green:hover { background: var(--green-dark); }
+    .btn-outline { background: var(--panel); color: #fff; border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--green); }
+    .btn-danger { background: rgba(234, 67, 53, 0.15); color: #ff8a80; border: 1px solid var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+
+    /* Pílulas interativas do Chat */
+    .chat-pill-btn {
+      background: rgba(37, 211, 102, 0.15);
+      border: 1px solid var(--green);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .chat-pill-btn:hover { background: var(--green); color: #111b21; }
+
+    /* Central de Agendamentos */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--panel);
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .filter-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .filter-btn.active-filter {
+      background: var(--card);
+      border-color: var(--green);
+      color: #fff;
+    }
+    .appointments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .appointment-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.2s, opacity 0.3s;
+    }
+    .appointment-card.booked { border-left: 4px solid var(--green); }
+    .appointment-card.cancelled { border-left: 4px solid var(--muted); opacity: 0.5; }
+    .niche-tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      background: rgba(37, 211, 102, 0.12);
+      color: var(--green);
+    }
+
+    /* Galeria Meu Estúdio */
+    .studio-gallery-niche {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .gallery-slots {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 650px) {
+      .gallery-slots { grid-template-columns: 1fr; }
+    }
+    .gallery-img-box {
+      height: 160px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+      position: relative;
+    }
+    .gallery-img-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gallery-tag {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: rgba(17, 27, 33, 0.85);
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Modal Elegante */
+    .custom-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .custom-modal-backdrop.active-modal {
+      display: flex;
+    }
+    .custom-modal-card {
+      background: #182229;
+      border: 1px solid #3b4a54;
+      border-radius: 18px;
+      max-width: 440px;
+      width: 100%;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      gap: 14px;
+    }
+    .modal-icon-circle {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(234, 67, 53, 0.15);
+      border: 2px solid var(--danger);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .modal-actions button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn-modal-cancel {
+      background: #2a3942;
+      border: 1px solid #3b4a54;
+      color: #fff;
+    }
+    .btn-modal-confirm {
+      background: var(--danger);
+      border: none;
+      color: #fff;
+    }
+    .btn-modal-confirm:hover { background: var(--danger-hover); }
+
+    /* Toast Flutuante */
+    .toast-box {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #202c33;
+      border: 2px solid var(--green);
+      color: #fff;
+      padding: 14px 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      font-size: 14px;
+      font-weight: 800;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 1000;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/comecar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio</span>
+    </a>
+    <nav>
+      <a href="/comecar">📲 Conectar meu WhatsApp</a>
+      <a href="/painel?acesso={{ studio.dashboard_chave.replace('token', 'chave') if studio.dashboard_chave else '' }}" class="active">📋 Painel</a>
+      <a href="/configurar-estudio?acesso={{ studio.dashboard_chave.replace('token', 'chave') if studio.dashboard_chave else '' }}">⚙️ Configurar Estúdio</a>
+      <a href="/instalar">📱 Instalar App</a>
+      <a href="/ajuda">❓ Ajuda</a>
+      <a href="/privacidade">🔒 Privacidade</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Barra Superior de Identidade e Status -->
+    <div class="status-bar" id="statusBar">
+      <div>
+        <h1 style="font-size: 20px; font-weight: 800; color: #fff;">
+          {{ studio.studio_name }}
+        </h1>
+        <div style="font-size: 13.5px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span>Fotógrafo: <strong style="color: #fff;">{{ studio.photographer_name }}</strong></span>
+          <span>•</span>
+          {% if studio.status == 'PAUSED' %}
+            <span class="badge-status badge-paused">🛑 BOT DESLIGADO / PAUSADO</span>
+          {% elif studio.status == 'WAITING_HUMAN' %}
+            <span class="badge-status badge-human">⏸️ AGUARDANDO VOCÊ (MODO HUMANO)</span>
+          {% else %}
+            <span class="badge-status badge-active">
+              <span class="pulse-dot"></span>
+              ● SECRETÁRIA ATIVA ({{ studio.secretary_name }})
+            </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        {% if studio.status in ['PAUSED', 'WAITING_HUMAN'] %}
+          <button type="button" class="btn btn-green" onclick="alternarStatusSecretaria('ACTIVE')">
+            ▶️ LIGAR SECRETÁRIA
+          </button>
+        {% else %}
+          <button type="button" class="btn btn-outline" style="border-color: #ea4335; color: #ea4335;" onclick="alternarStatusSecretaria('PAUSED')">
+            🛑 DESLIGAR / PAUSAR BOT
+          </button>
+        {% endif %}
+        <button type="button" class="btn btn-outline" style="border-color: var(--green); color: var(--green);" onclick="abrirModalWhatsAppPainel()">
+          📲 Meu WhatsApp / QR Code
+        </button>
+      </div>
+    </div>
+
+    <!-- Navegação em 3 Abas Principais (SPA Sem Reload) -->
+    <div class="tab-nav">
+      <button type="button" class="tab-btn active-tab" id="tabBtnConversas" onclick="mudarAba('conversas')">
+        💬 Conversas ao Vivo
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnAgendamentos" onclick="mudarAba('agendamentos')">
+        📅 Agendamentos
+        {% if booked_slots %}
+          <span style="background: var(--green); color: #111b21; border-radius: 10px; padding: 2px 7px; font-size: 11px; font-weight: 900;">
+            {{ booked_slots|length }}
+          </span>
+        {% endif %}
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnStudio" onclick="mudarAba('studio')">
+        📸 Meu Estúdio
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnIg" onclick="mudarAba('ig')" style="margin-left: auto;">
+        📷 Instagram
+        {% if metrics.ig_waiting_count %}
+          <span style="background: #E1306C; color: #fff; border-radius: 10px; padding: 2px 7px; font-size: 11px;">
+            {{ metrics.ig_waiting_count }}
+          </span>
+        {% endif %}
+      </button>
+    </div>
+
+    <!-- ABA 1: CONVERSAS AO VIVO (CHAT DE TESTES ROBUSTO) -->
+    <div class="tab-pane active-pane" id="paneConversas">
+      <!-- Métricas Rápidas -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">💬 Leads hoje</div>
+          <div class="metric-value">{{ metrics.leads_today }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">📅 Agendamentos</div>
+          <div class="metric-value">{{ metrics.booked_count }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">📈 Taxa conversão</div>
+          <div class="metric-value">{{ metrics.conversion_rate }}%</div>
+        </div>
+      </div>
+
+      <!-- 3 Colunas: Conversando agora | Precisa de você | Próximos horários -->
+      <div class="columns-3">
+        <!-- Coluna 1: Conversando Agora (Chat de Testes em Tempo Real) -->
+        <section class="col-card">
+          <div class="col-title">
+            <span>💬 Chat de Teste da Secretária</span>
+            <button
+              type="button"
+              class="btn btn-outline"
+              style="font-size: 11.5px; padding: 5px 10px; border-color: #3b4a54;"
+              onclick="reiniciarChatTeste()"
+            >
+              🔄 Reiniciar Conversa
+            </button>
+          </div>
+
+          <!-- Formulário de Envio -->
+          <form onsubmit="return enviarMensagemChat(event)" style="display: flex; gap: 8px;">
+            <input
+              type="text"
+              id="simInput"
+              placeholder="Digite uma mensagem (ex: Bom dia, quero fotos)..."
+              style="flex: 1; background: #2a3942; color: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13.5px;"
+            />
+            <button type="submit" class="btn btn-green" id="btnSendChat">Enviar</button>
+          </form>
+
+          <!-- Atalhos Rápidos -->
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Bom dia!')">☀️ Bom dia</button>
+            <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero ver fotos de gestante')">🤰 Gestante</button>
+            <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero agendar o primeiro horário')">📅 Agendar</button>
+            <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero falar com o fotógrafo')">🙋‍♂️ Humano</button>
+          </div>
+
+          <!-- Histórico de Mensagens do Chat -->
+          <div id="chatMessagesContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 440px; overflow-y: auto;">
+            {% if conversations %}
+              {% for msg in conversations %}
+                <div class="item-box" style="border-left: 3px solid {% if msg.direction == 'out' or msg.direction == 'bot' %}#25D366{% else %}#53bdeb{% endif %};">
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+                    <strong>{% if msg.direction == 'out' or msg.direction == 'bot' %}🤖 {{ studio.secretary_name }}{% else %}👤 Visitante{% endif %}</strong>
+                    <span>{{ msg.timestamp }}</span>
+                  </div>
+                  <div style="font-size: 14px; color: #fff; line-height: 1.4;">{{ msg.content }}</div>
+                  {% if msg.transcribed_audio %}
+                    <div style="background: rgba(37, 211, 102, 0.12); padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: #25D366;">
+                      🎙️ <strong>Áudio transcrito:</strong> "{{ msg.transcribed_audio }}"
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div id="emptyChatNotice" style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px;">
+                Nenhuma mensagem no chat de testes. Digite algo acima ou clique nos atalhos para conversar com a {{ studio.secretary_name }}!
+              </div>
+            {% endif %}
+          </div>
+        </section>
+
+        <!-- Coluna 2: Precisa de Você (WAITING_HUMAN) -->
+        <section class="col-card">
+          <div class="col-title">
+            <span>🚨 Precisa de você</span>
+            <span style="font-size: 12px; color: var(--warn);">{{ waiting_list|length }} pendente(s)</span>
+          </div>
+
+          {% if studio.status == 'WAITING_HUMAN' or waiting_list %}
+            <div class="item-box" style="border: 1px solid var(--warn); background: rgba(251, 188, 4, 0.1);">
+              <div style="font-size: 14px; font-weight: 800; color: var(--warn);">
+                ⏸️ Atendimento Humano Ativado
+              </div>
+              <p style="font-size: 13px; color: #d1d7db; line-height: 1.4;">
+                A secretária pausou as respostas automáticas para você conversar com o cliente.
+              </p>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <button type="button" class="btn btn-green" style="flex: 1;" onclick="retomarAtendimentoAutomatico()">
+                  ▶️ Retomar Secretária IA
+                </button>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if waiting_list %}
+            {% for w in waiting_list %}
+              <div class="item-box">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="color: #fff; font-size: 14px;">👤 {{ w.client_name or ('Contato ' ~ w.wa_id[-4:]) }}</strong>
+                  <span style="font-size: 11.5px; color: var(--warn); font-weight: 700;">Aguardando você</span>
+                </div>
+                <p style="font-size: 13px; color: var(--muted);">{{ w.content }}</p>
+                <div style="display: flex; gap: 8px;">
+                  <a href="https://wa.me/{{ w.wa_id }}" target="_blank" rel="noreferrer" class="btn btn-outline" style="flex: 1; text-align: center;">
+                    💬 Assumir Conversa
+                  </a>
+                  <button type="button" class="btn btn-green" onclick="retomarAtendimentoAutomatico('{{ w.wa_id }}')">
+                    ✅ Retomar IA
+                  </button>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <p style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px;">
+              Nenhum cliente aguardando atendimento pessoal agora.
+            </p>
+          {% endif %}
+        </section>
+
+        <!-- Coluna 3: Horários Livres na Agenda -->
+        <section class="col-card">
+          <div class="col-title">
+            <span>🟢 Próximos Horários Livres</span>
+            <span style="font-size: 12px; color: var(--green);">{{ free_slots|length }} livres</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            {% for free_slot in free_slots %}
+              <div class="item-box" style="padding: 10px 14px; flex-direction: row; justify-content: space-between; align-items: center;">
+                <strong style="color: #fff; font-size: 13.5px;">{{ free_slot.start_at }}</strong>
+                <span class="niche-tag">Disponível</span>
+              </div>
+            {% else %}
+              <p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">
+                Nenhum horário livre nos próximos dias.
+              </p>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+    </div><!-- Fim paneConversas -->
+
+    <!-- ABA 2: CENTRAL DE AGENDAMENTOS (MODAL ELEGANTE + NOTIFICAÇÃO REAL) -->
+    <div class="tab-pane" id="paneAgendamentos">
+      <!-- Filtros Rápidos -->
+      <div class="filter-bar">
+        <button type="button" class="filter-btn active-filter" id="filterBtnAll" onclick="filtrarAgendamentos('all')">
+          📋 Todos os Agendamentos
+        </button>
+        <button type="button" class="filter-btn" id="filterBtnToday" onclick="filtrarAgendamentos('today')">
+          ☀️ Hoje
+        </button>
+        <button type="button" class="filter-btn" id="filterBtnWeek" onclick="filtrarAgendamentos('week')">
+          📅 Esta Semana
+        </button>
+      </div>
+
+      <!-- Grid de Cards de Agendamentos -->
+      <div class="appointments-grid" id="agendamentosGrid">
+        {% if booked_slots %}
+          {% for slot in booked_slots %}
+            <div
+              class="appointment-card booked"
+              id="card-slot-{{ slot.id }}"
+              data-date-iso="{{ slot.raw_start_at or '' }}"
+              data-slot-id="{{ slot.id }}"
+            >
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                  <strong style="color: #fff; font-size: 16px;">👤 {{ slot.client_name if (slot.client_name and slot.client_name != 'Cliente') else 'Cliente Confirmado' }}</strong>
+                  <div style="font-size: 13px; color: var(--muted); margin-top: 2px;">
+                    📱 {{ slot.client_wa_id or 'WhatsApp' }}
+                  </div>
+                </div>
+                <span class="niche-tag">
+                  {{ slot.niche or 'Ensaio Geral' }}
+                </span>
+              </div>
+
+              <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                <div style="font-size: 12px; color: var(--muted);">Data e Horário do Ensaio:</div>
+                <div style="font-size: 15px; font-weight: 800; color: #fff; margin-top: 2px;">
+                  🕒 {{ slot.start_at }}
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                {% if slot.client_wa_id %}
+                  <a
+                    href="https://wa.me/{{ slot.client_wa_id }}"
+                    target="_blank"
+                    rel="noreferrer"
+                    class="btn btn-outline"
+                    style="flex: 1;"
+                  >
+                    💬 WhatsApp
+                  </a>
+                {% endif %}
+
+                {% if slot.receipt_path or slot.comprovante_id %}
+                  <a
+                    href="{{ slot.receipt_path or ('/static/comprovantes/' ~ slot.comprovante_id ~ '.png') }}"
+                    target="_blank"
+                    class="btn btn-outline"
+                    style="border-color: var(--green); color: var(--green);"
+                  >
+                    📄 Ver Comprovante
+                  </a>
+                {% endif %}
+              </div>
+
+              <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; display: flex; justify-content: flex-end;">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  id="btn-cancel-{{ slot.id }}"
+                  onclick="abrirModalCancelar({{ slot.id }}, '{{ slot.client_name or '' }}', '{{ slot.start_at }}')"
+                >
+                  ❌ Desmarcar Horário
+                </button>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div style="grid-column: 1 / -1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 40px 20px; text-align: center;">
+            <p style="color: var(--muted); font-size: 15px;">
+              Nenhum agendamento ativo no momento. Quando um cliente reservar pelo WhatsApp, o card aparecerá aqui automaticamente com o comprovante!
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </div><!-- Fim paneAgendamentos -->
+
+    <!-- ABA 3: MEU ESTÚDIO (PORTFÓLIO E DADOS) -->
+    <div class="tab-pane" id="paneStudio">
+      <div class="status-bar" style="border: 1px solid var(--border);">
+        <div>
+          <h2 style="font-size: 18px; color: #fff;">{{ studio.studio_name }}</h2>
+          <p style="font-size: 13.5px; color: var(--muted); margin-top: 2px;">
+            Fotógrafo: <strong style="color: #fff;">{{ studio.photographer_name }}</strong> • Secretária: <strong style="color: var(--green);">{{ studio.secretary_name }}</strong> • Valores: <strong style="color: #fff;">{{ studio.price }}</strong>
+          </p>
+        </div>
+        <a href="/configurar-estudio?acesso={{ studio.dashboard_chave.replace('token', 'chave') if studio.dashboard_chave else '' }}" class="btn btn-outline" style="border-color: var(--green); color: #fff;">
+          ✏️ Editar Nichos e Fotos
+        </a>
+      </div>
+
+      <!-- Gestante -->
+      <div class="studio-gallery-niche">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #fff; font-size: 15px;">🤰 Fotos do Ensaio Gestante (Até 3)</strong>
+          <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
+        </div>
+        <div class="gallery-slots">
+          {% for img in photos_by_niche.get('gestante', [])[:3] %}
+            <div class="gallery-img-box">
+              <img src="{{ img }}" alt="Gestante" />
+              {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
+            </div>
+          {% else %}
+            <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Newborn -->
+      <div class="studio-gallery-niche">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #fff; font-size: 15px;">👶 Fotos do Ensaio Newborn (Até 3)</strong>
+          <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
+        </div>
+        <div class="gallery-slots">
+          {% for img in photos_by_niche.get('newborn', [])[:3] %}
+            <div class="gallery-img-box">
+              <img src="{{ img }}" alt="Newborn" />
+              {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
+            </div>
+          {% else %}
+            <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Família -->
+      <div class="studio-gallery-niche">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #fff; font-size: 15px;">👨‍👩‍👧 Fotos do Ensaio Família (Até 3)</strong>
+          <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
+        </div>
+        <div class="gallery-slots">
+          {% for img in photos_by_niche.get('familia', [])[:3] %}
+            <div class="gallery-img-box">
+              <img src="{{ img }}" alt="Família" />
+              {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
+            </div>
+          {% else %}
+            <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div><!-- Fim paneStudio -->
+
+    <!-- ABA 4: INSTAGRAM -->
+    <div class="tab-pane" id="paneIg">
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">📸 Comentários detectados</div>
+          <div class="metric-value">{{ metrics.ig_comments_count }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🚨 Aguardando no Instagram</div>
+          <div class="metric-value" style="color: var(--warn);">{{ metrics.ig_waiting_count }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">⚡ Gatilhos ativos</div>
+          <div class="metric-value" style="font-size: 16px; font-weight: 700; color: var(--green);">Comment, Story & DM</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+        <section class="col-card" style="border-top: 3px solid #E1306C;">
+          <div class="col-title">
+            <span style="color: #E1306C;">📸 Comentários que viraram DM</span>
+            <span style="font-size: 12px; color: var(--muted);">{{ ig_comments|length }} registrado(s)</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
+            {% if ig_comments %}
+              {% for cmt in ig_comments %}
+                <div class="item-box" style="border-left: 3px solid #E1306C;">
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+                    <strong style="color: #fff;">@{{ cmt.username }}</strong>
+                    <span>{{ cmt.formatted_time }}</span>
+                  </div>
+                  <div style="font-size: 13.5px; color: #d1d7db; margin-top: 4px;">💬 "{{ cmt.content }}"</div>
+                  {% if cmt.reply_sent %}
+                    <div style="background: rgba(225, 48, 108, 0.1); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #ff85a2; margin-top: 6px;">
+                      {{ cmt.reply_sent }}
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <p style="color: var(--muted); font-size: 13px; text-align: center; padding: 30px;">
+                Nenhum comentário recente no Instagram.
+              </p>
+            {% endif %}
+          </div>
+        </section>
+
+        <section class="col-card" style="border-top: 3px solid var(--warn);">
+          <div class="col-title">
+            <span>🚨 DMs Pendentes no Instagram</span>
+            <span style="font-size: 12px; color: var(--warn);">{{ ig_waiting|length }} pendente(s)</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
+            {% if ig_waiting %}
+              {% for iw in ig_waiting %}
+                <div class="item-box" style="border: 1px solid var(--warn);">
+                  <strong style="color: #fff; font-size: 14px;">@{{ iw.username }}</strong>
+                  <div style="font-size: 13px; color: var(--muted);">Aguardando resposta pessoal</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p style="color: var(--muted); font-size: 13px; text-align: center; padding: 30px;">
+                Nenhuma DM pendente.
+              </p>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+    </div><!-- Fim paneIg -->
+  </main>
+
+  <!-- MODAL CUSTOMIZADO E ELEGANTE DE CANCELAMENTO -->
+  <div class="custom-modal-backdrop" id="modalCancelarAgendamento">
+    <div class="custom-modal-card">
+      <div class="modal-icon-circle">⚠️</div>
+      <h3 style="color: #fff; font-size: 18px; font-weight: 800;">Desmarcar Agendamento?</h3>
+      <p style="color: #d1d7db; font-size: 14px; line-height: 1.45;" id="modalCancelDesc">
+        O horário ficará livre novamente na sua agenda e o cliente receberá uma confirmação automática por mensagem.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal-cancel" onclick="fecharModalCancelar()">
+          Voltar
+        </button>
+        <button type="button" class="btn-modal-confirm" id="btnConfirmarCancelamento" onclick="executarCancelamento()">
+          Sim, Desmarcar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST VERDE DE NOTIFICAÇÃO -->
+  <div class="toast-box" id="toastNotificacao">
+    <span>✅</span>
+    <span id="toastMsg">Agendamento desmarcado e cliente notificado!</span>
+  </div>
+
+  <!-- MODAL QR CODE WHATSAPP -->
+  <dialog id="modalPainelWa" style="margin: auto; background: var(--card); color: var(--text); border: 2px solid var(--green); border-radius: 18px; padding: 24px; max-width: 440px; width: calc(100% - 32px); text-align: center;">
+    <h3 id="waModalTitle" style="color: #25D366; font-size: 19px; margin-bottom: 10px;">📲 Status do seu WhatsApp</h3>
+    <p id="waModalText" style="font-size: 14px; color: #d1d7db; margin-bottom: 14px; line-height: 1.45;">
+      Verificando conexão do seu aparelho...
+    </p>
+    <div id="waModalQrBox" style="display: none; margin: 12px auto; background: #fff; padding: 14px; border-radius: 14px; width: fit-content;">
+      <img id="waModalQrImg" src="" alt="QR WhatsApp" style="width: 220px; height: 220px; display: block;" />
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+      <button type="button" class="btn btn-green" onclick="gerarNovoQrNoPainel()">
+        🔄 Trocar Celular / Gerar Novo QR Code
+      </button>
+      <button type="button" class="btn btn-outline" onclick="fecharModalWaPainel()">
+        Fechar janela
+      </button>
+    </div>
+  </dialog>
+
+  <script>
+    const STUDIO_ID = '{{ studio.id }}';
+    const SECRETARY_NAME = '{{ studio.secretary_name }}';
+    const DASHBOARD_CHAVE = '{{ studio.dashboard_chave }}';
+    let slotIdParaCancelar = null;
+
+    function mudarAba(aba) {
+      const abas = ['conversas', 'agendamentos', 'studio', 'ig'];
+      abas.forEach(a => {
+        const btn = document.getElementById('tabBtn' + a.charAt(0).toUpperCase() + a.slice(1));
+        const pane = document.getElementById('pane' + a.charAt(0).toUpperCase() + a.slice(1));
+        if (btn) btn.classList.toggle('active-tab', a === aba);
+        if (pane) pane.classList.toggle('active-pane', a === aba);
+      });
+    }
+
+    async function alternarStatusSecretaria(novoStatus) {
+      try {
+        const resp = await fetch('/dashboard/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID || 'studio-principal', status: novoStatus })
+        });
+        if (resp.ok) window.location.reload();
+      } catch (e) {
+        alert('Erro ao alterar status.');
+      }
+    }
+
+    async function retomarAtendimentoAutomatico(waId) {
+      try {
+        await fetch('/dashboard/retomar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID, wa_id: waId || '' })
+        });
+        window.location.reload();
+      } catch (e) {}
+    }
+
+    // Modal Elegante de Cancelamento
+    function abrirModalCancelar(slotId, cliente, dataHora) {
+      slotIdParaCancelar = slotId;
+      const desc = document.getElementById('modalCancelDesc');
+      const nomeCliente = (cliente && cliente !== 'Cliente') ? cliente : 'do cliente';
+      desc.textContent = `Tem certeza que deseja desmarcar o ensaio ${nomeCliente} (${dataHora})? O horário voltará a ficar disponível e o cliente receberá mensagem de aviso.`;
+      document.getElementById('modalCancelarAgendamento').classList.add('active-modal');
+    }
+
+    function fecharModalCancelar() {
+      slotIdParaCancelar = null;
+      document.getElementById('modalCancelarAgendamento').classList.remove('active-modal');
+    }
+
+    async function executarCancelamento() {
+      if (!slotIdParaCancelar) return;
+      const slotId = slotIdParaCancelar;
+      const btnConfirmar = document.getElementById('btnConfirmarCancelamento');
+      const btnCard = document.getElementById(`btn-cancel-${slotId}`);
+
+      btnConfirmar.disabled = true;
+      btnConfirmar.textContent = 'Desmarcando...';
+      if (btnCard) btnCard.disabled = true;
+
+      try {
+        const resp = await fetch(`/agendamentos/${slotId}/cancelar?acesso=${encodeURIComponent(DASHBOARD_CHAVE)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        if (data && data.ok) {
+          fecharModalCancelar();
+          mostrarToast('Agendamento desmarcado e cliente notificado!');
+          const card = document.getElementById(`card-slot-${slotId}`);
+          if (card) {
+            card.classList.remove('booked');
+            card.classList.add('cancelled');
+            card.style.opacity = '0.3';
+            setTimeout(() => card.remove(), 1200);
+          }
+        } else {
+          alert('Erro ao desmarcar: ' + (data.error || 'Tente novamente.'));
+        }
+      } catch (e) {
+        alert('Erro de conexão ao desmarcar.');
+      } finally {
+        btnConfirmar.disabled = false;
+        btnConfirmar.textContent = 'Sim, Desmarcar';
+      }
+    }
+
+    function mostrarToast(msg) {
+      const toast = document.getElementById('toastNotificacao');
+      const msgEl = document.getElementById('toastMsg');
+      if (toast && msgEl) {
+        msgEl.textContent = msg;
+        toast.style.display = 'flex';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+      }
+    }
+
+    function filtrarAgendamentos(filtro) {
+      document.getElementById('filterBtnAll').classList.toggle('active-filter', filtro === 'all');
+      document.getElementById('filterBtnToday').classList.toggle('active-filter', filtro === 'today');
+      document.getElementById('filterBtnWeek').classList.toggle('active-filter', filtro === 'week');
+
+      const cards = document.querySelectorAll('#agendamentosGrid .appointment-card');
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+
+      cards.forEach(card => {
+        const rawDate = card.getAttribute('data-date-iso') || '';
+        if (filtro === 'all') {
+          card.style.display = 'flex';
+        } else if (filtro === 'today') {
+          card.style.display = rawDate.startsWith(todayStr) ? 'flex' : 'none';
+        } else if (filtro === 'week') {
+          if (!rawDate) {
+            card.style.display = 'flex';
+            return;
+          }
+          const dt = new Date(rawDate);
+          const diffDays = (dt - now) / (1000 * 60 * 60 * 24);
+          card.style.display = (diffDays >= -1 && diffDays <= 7) ? 'flex' : 'none';
+        }
+      });
+    }
+
+    // Chat de Testes em Tempo Real com Botões Interativos
+    function renderMensagemChat(autor, texto, options) {
+      const container = document.getElementById('chatMessagesContainer');
+      const empty = document.getElementById('emptyChatNotice');
+      if (empty) empty.remove();
+
+      const isBot = autor === 'bot';
+      const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      let pillsHtml = '';
+      if (options && options.length > 0) {
+        pillsHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
+          options.map(opt => `<button type="button" class="chat-pill-btn" onclick="enviarAtalho('${opt}')">${opt}</button>`).join('') +
+          '</div>';
+      }
+
+      const item = document.createElement('div');
+      item.className = 'item-box';
+      item.style.borderLeft = isBot ? '3px solid #25D366' : '3px solid #53bdeb';
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+          <strong>${isBot ? ('🤖 ' + SECRETARY_NAME) : '👤 Você'}</strong>
+          <span>${timeStr}</span>
+        </div>
+        <div style="font-size: 14px; color: #fff; line-height: 1.4;">${texto}</div>
+        ${pillsHtml}
+      `;
+      container.appendChild(item);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function enviarMensagemChat(ev) {
+      if (ev) ev.preventDefault();
+      const inp = document.getElementById('simInput');
+      const txt = inp.value.trim();
+      if (!txt) return false;
+      inp.value = '';
+      return processarEnvioChat(txt);
+    }
+
+    async function enviarAtalho(msg) {
+      return processarEnvioChat(msg);
+    }
+
+    async function processarEnvioChat(txt) {
+      renderMensagemChat('user', txt, []);
+      const btn = document.getElementById('btnSendChat');
+      if (btn) btn.disabled = true;
+
+      try {
+        const resp = await fetch('/simular-conversa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID, text: txt })
+        });
+        const data = await resp.json();
+        if (data && data.ok) {
+          renderMensagemChat('bot', data.reply, data.options || []);
+        }
+      } catch (e) {
+        renderMensagemChat('bot', 'Ops, tive uma falha de conexão rápida. Pode tentar novamente?', []);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+      return false;
+    }
+
+    async function reiniciarChatTeste() {
+      const btn = (typeof event !== "undefined" && event) ? (event.target || event.currentTarget) : null;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "🔄 Reiniciando...";
+      }
+      try {
+        const resp = await fetch(`/chat-teste/reset?acesso=${encodeURIComponent(DASHBOARD_CHAVE)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        const data = await resp.json();
+        if (data && data.ok) {
+          const container = document.getElementById("chatMessagesContainer");
+          if (container) {
+            container.innerHTML = `
+              <div id="emptyChatNotice" style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px;">
+                Conversa reiniciada com sucesso! Digite uma saudação (ex: "Bom dia") para testar a secretária.
+              </div>
+            `;
+          }
+          mostrarToast("Chat de testes reiniciado do zero!");
+        }
+      } catch (e) {
+        mostrarToast("Erro ao reiniciar chat.");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "🔄 Reiniciar Conversa";
+        }
+      }
+    }
+
+    function abrirModalWhatsAppPainel() {
+      const m = document.getElementById('modalPainelWa');
+      if (m && !m.open) m.showModal();
+    }
+
+    function fecharModalWaPainel() {
+      const m = document.getElementById('modalPainelWa');
+      if (m) m.close();
+    }
+  </script>
+</body>
+</html>

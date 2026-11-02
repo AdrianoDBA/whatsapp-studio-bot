@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configurar Estúdio — Bot do Studio</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --card: #202c33;
+      --green: #25D366;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --border: #2a3942;
+      --danger: #ea4335;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main { max-width: 840px; margin: 0 auto; padding: 24px 16px 80px; display: flex; flex-direction: column; gap: 20px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    h1 { font-size: 24px; font-weight: 800; color: #fff; }
+    h2 { font-size: 17px; font-weight: 700; color: var(--green); }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .field label { display: block; font-size: 13.5px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .hint { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%;
+      background: #2a3942;
+      color: #fff;
+      border: 1px solid #3b4a54;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+    input:focus { border-color: var(--green); }
+    
+    /* Nichos e Toggles */
+    .niche-block {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: all 0.25s ease;
+    }
+    .niche-block.disabled {
+      opacity: 0.45;
+      background: rgba(17, 27, 33, 0.4);
+    }
+    .niche-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .niche-toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 16px;
+      color: #fff;
+    }
+    .niche-toggle-label input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--green);
+      cursor: pointer;
+    }
+
+    .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 600px) {
+      .photos-grid { grid-template-columns: 1fr; }
+    }
+    .photo-slot {
+      height: 160px;
+      background: #182229;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      text-align: center;
+      padding: 10px;
+      transition: border-color 0.2s;
+    }
+    .photo-slot.has-img { border-color: var(--green); border-style: solid; }
+    .photo-slot img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+    .photo-tag {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 3;
+      background: rgba(17, 27, 33, 0.88);
+      color: var(--green);
+      border: 1px solid var(--green);
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+    .photo-slot span.slot-btn {
+      position: relative;
+      z-index: 2;
+      background: rgba(17, 27, 33, 0.85);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: #fff;
+      font-weight: 700;
+      margin-top: auto;
+    }
+    .lgpd-box {
+      background: rgba(37, 211, 102, 0.1);
+      border: 1px solid var(--green);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .lgpd-box input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--green); cursor: pointer; }
+    .btn-submit {
+      background: #25D366;
+      color: #111b21;
+      font-size: 18px;
+      font-weight: 900;
+      padding: 18px;
+      border-radius: 14px;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: 0 8px 25px rgba(37, 211, 102, 0.35);
+      transition: background 0.2s;
+    }
+    .btn-submit:hover { background: #1ebd5b; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/comecar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio</span>
+    </a>
+    <nav>
+      <a href="/comecar">🚀 Começar</a>
+      <a href="{{ dashboard_url }}">📋 Painel</a>
+      <a href="/configurar-estudio?acesso={{ studio.dashboard_token }}" class="active">⚙️ Configurar Estúdio</a>
+      <a href="/instalar">📲 Instalar App</a>
+      <a href="/ajuda">❓ Ajuda</a>
+      <a href="/privacidade">🔒 Privacidade</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h1>Configurar Identidade e Portfólio 📸</h1>
+      <p style="color: var(--muted); font-size: 14.5px; line-height: 1.5;">
+        Configure sua secretária virtual e escolha quais nichos você atende. Já deixamos fotos de demonstração pré-carregadas para você começar na hora!
+      </p>
+    </div>
+
+    <form id="configForm" onsubmit="return salvarConfiguracao(event)">
+      <div class="card">
+        <h2>1. Identidade do Estúdio</h2>
+        <div class="grid-2">
+          <div class="field">
+            <label for="studio_name">Nome do Estúdio *</label>
+            <span class="hint">Ex: Studio Luz & Arte</span>
+            <input type="text" id="studio_name" required maxlength="50" value="{{ studio.studio_name or 'Studio Luz & Arte' }}" />
+          </div>
+          <div class="field">
+            <label for="photographer_name">Seu Nome (Fotógrafo) *</label>
+            <span class="hint">Ex: Gustavo ou Leo</span>
+            <input type="text" id="photographer_name" required maxlength="50" value="{{ studio.photographer_name or 'Gustavo' }}" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="secretary_name">Nome da Secretária Virtual *</label>
+            <span class="hint">Padrão sugerido: Lara</span>
+            <input type="text" id="secretary_name" required maxlength="50" value="{{ studio.secretary_name or 'Lara' }}" />
+          </div>
+          <div class="field">
+            <label for="price">Valores e Pacotes de Ensaio *</label>
+            <span class="hint">Ex: Ensaios a partir de R$ 450 (Sinal R$ 100)</span>
+            <input type="text" id="price" required maxlength="120" value="{{ studio.price or 'Ensaios a partir de R$ 450' }}" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h2>2. Nichos de Atuação e Portfólio (3 Fotos por Especialidade)</h2>
+        <p style="font-size: 13.5px; color: var(--muted);">
+          Ative os nichos que você fotografa. Se desmarcar um nicho, a secretária não o oferecerá aos clientes. As fotos já vêm pré-carregadas com modelos de alta qualidade para teste.
+        </p>
+
+        <!-- Bloco 1: Gestante -->
+        <div class="niche-block" id="block_gestante">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_gestante" onchange="alternarBlocoNicho('gestante')" {% if 'gestante' in active_niches %}checked{% endif %} />
+              <span>🤰 Atuo com Ensaio Gestante</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_gestante">
+            <!-- 3 slots -->
+          </div>
+        </div>
+
+        <!-- Bloco 2: Newborn -->
+        <div class="niche-block" id="block_newborn">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_newborn" onchange="alternarBlocoNicho('newborn')" {% if 'newborn' in active_niches %}checked{% endif %} />
+              <span>👶 Atuo com Ensaio Newborn</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_newborn">
+            <!-- 3 slots -->
+          </div>
+        </div>
+
+        <!-- Bloco 3: Família -->
+        <div class="niche-block" id="block_familia">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_familia" onchange="alternarBlocoNicho('familia')" {% if 'familia' in active_niches %}checked{% endif %} />
+              <span>👨‍👩‍👧 Atuo com Ensaio Família</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_familia">
+            <!-- 3 slots -->
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h2>3. Proteção de Dados (LGPD)</h2>
+        <label class="lgpd-box">
+          <input type="checkbox" id="consent_lgpd" required {% if studio.consent_lgpd %}checked{% endif %} />
+          <span style="font-size: 14.5px; font-weight: 700; color: #fff;">
+            Concordo que meus dados serão usados apenas para o atendimento do estúdio funcionar
+          </span>
+        </label>
+        <p style="font-size: 12.5px; color: var(--muted);">
+          Você tem total controle sobre seus dados e pode apagar tudo em 1 clique a qualquer momento.
+        </p>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <button type="submit" class="btn-submit" id="btnSubmit">
+          SALVAR E REVISAR MEU ESTÚDIO →
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    const DASHBOARD_CHAVE = '{{ studio.dashboard_token }}';
+    let fotosData = {
+      gestante: [],
+      newborn: [],
+      familia: []
+    };
+
+    try {
+      const initPhotos = {{ photos|tojson }};
+      const parsed = typeof initPhotos === 'string' ? JSON.parse(initPhotos) : (initPhotos || {});
+      if (parsed.gestante) fotosData.gestante = parsed.gestante;
+      if (parsed.newborn) fotosData.newborn = parsed.newborn;
+      if (parsed.familia) fotosData.familia = parsed.familia;
+      if (parsed['família']) fotosData.familia = parsed['família'];
+    } catch (e) {}
+
+    function alternarBlocoNicho(niche) {
+      const cb = document.getElementById('toggle_' + niche);
+      const blk = document.getElementById('block_' + niche);
+      if (cb && blk) {
+        blk.classList.toggle('disabled', !cb.checked);
+      }
+    }
+
+    function renderSlots(niche) {
+      const grid = document.getElementById('grid_' + niche);
+      if (!grid) return;
+      let html = '';
+      for (let i = 0; i < 3; i++) {
+        const url = (fotosData[niche] && fotosData[niche][i]) || '';
+        const hasImg = Boolean(url);
+        const isDemo = hasImg && url.includes('/static/demo_photos/');
+        const tagHtml = isDemo ? '<span class="photo-tag">Foto de Teste (Clique para trocar)</span>' : (hasImg ? '<span class="photo-tag">Sua Foto Pronta</span>' : '');
+
+        html += `
+          <label class="photo-slot ${hasImg ? 'has-img' : ''}" id="slot_${niche}_${i}">
+            ${tagHtml}
+            <img id="img_${niche}_${i}" src="${url}" alt="Foto ${i+1}" style="${hasImg ? 'display:block;' : 'display:none;'}" />
+            <span class="slot-btn" id="lbl_${niche}_${i}">${hasImg ? 'Trocar Foto ' + (i+1) : '➕ Enviar Foto ' + (i+1)}</span>
+            <input type="file" accept="image/*" style="display:none;" onchange="comprimirFoto(event, '${niche}', ${i})" />
+          </label>
+        `;
+      }
+      grid.innerHTML = html;
+    }
+
+    function comprimirFoto(ev, niche, idx) {
+      const file = ev.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const maxDim = 800;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+          if (!fotosData[niche]) fotosData[niche] = [];
+          fotosData[niche][idx] = dataUrl;
+
+          const imgEl = document.getElementById(`img_${niche}_${idx}`);
+          const lblEl = document.getElementById(`lbl_${niche}_${idx}`);
+          const slotEl = document.getElementById(`slot_${niche}_${idx}`);
+          if (imgEl) {
+            imgEl.src = dataUrl;
+            imgEl.style.display = 'block';
+          }
+          if (lblEl) lblEl.textContent = 'Trocar Foto ' + (idx + 1);
+          if (slotEl) {
+            slotEl.classList.add('has-img');
+            const tag = slotEl.querySelector('.photo-tag');
+            if (tag) tag.textContent = 'Sua Foto Pronta';
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function salvarConfiguracao(ev) {
+      ev.preventDefault();
+      const consent = document.getElementById('consent_lgpd').checked;
+      if (!consent) {
+        alert('Por favor, aceite os termos de uso dos dados para continuar.');
+        return false;
+      }
+
+      const activeNiches = [];
+      if (document.getElementById('toggle_gestante').checked) activeNiches.push('gestante');
+      if (document.getElementById('toggle_newborn').checked) activeNiches.push('newborn');
+      if (document.getElementById('toggle_familia').checked) activeNiches.push('familia');
+
+      if (activeNiches.length === 0) {
+        alert('Por favor, selecione ao menos um nicho de atendimento ativo.');
+        return false;
+      }
+
+      const btn = document.getElementById('btnSubmit');
+      btn.textContent = 'SALVANDO CONFIGURAÇÃO...';
+      btn.disabled = true;
+
+      const payload = {
+        token: DASHBOARD_CHAVE,
+        studio_name: document.getElementById('studio_name').value,
+        photographer_name: document.getElementById('photographer_name').value,
+        secretary_name: document.getElementById('secretary_name').value,
+        price: document.getElementById('price').value,
+        active_niches: activeNiches,
+        photos: fotosData,
+        consent_lgpd: true
+      };
+
+      try {
+        const resp = await fetch(`/api/ativar-estudio?acesso=${encodeURIComponent(DASHBOARD_CHAVE)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data && data.ok) {
+          window.location.href = `/meu-estudio?acesso=${encodeURIComponent(DASHBOARD_CHAVE)}`;
+          return false;
+        } else {
+          alert('Erro ao salvar estúdio: ' + (data.error || 'Tente novamente'));
+          btn.textContent = 'SALVAR E REVISAR MEU ESTÚDIO →';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Erro de conexão ao salvar.');
+        btn.textContent = 'SALVAR E REVISAR MEU ESTÚDIO →';
+        btn.disabled = false;
+      }
+      return false;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderSlots('gestante');
+      renderSlots('newborn');
+      renderSlots('familia');
+      alternarBlocoNicho('gestante');
+      alternarBlocoNicho('newborn');
+      alternarBlocoNicho('familia');
+    });
+  </script>
+</body>
+</html>
