@@ -55,7 +55,7 @@ Camada SaaS multi-tenant para fotógrafos com PWA instalável (React + Vite), pe
 
 ---
 
-## 📸 MÓDULO INSTAGRAM (COMBO INSTA + ZAP R$ 197/mês)
+## 📸 MÓDULO INSTAGRAM (COMBO INSTA + ZAP)
 
 O Bot do Studio agora conta com o módulo completo de conversão automática no Instagram oficial da Meta Graph API:
 
