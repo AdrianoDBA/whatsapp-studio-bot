@@ -79,7 +79,7 @@ O Bot do Studio agora conta com o módulo completo de conversão automática no 
 ## 🛠️ Como Executar e Auditar
 
 ```bash
-cd /Users/adrianocme/.gemini/antigravity/scratch/whatsapp-studio-bot
+cd /Users... .gemini/antigravity/scratch/whatsapp-studio-bot
 source .venv/bin/activate
 
 # 1. Rodar suíte funcional (8 testes)
