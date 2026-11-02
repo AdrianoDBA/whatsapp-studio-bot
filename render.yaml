@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: whatsapp-studio-bot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 app:app"
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: TZ
+        value: America/Sao_Paulo
+      - key: WHATSAPP_APP_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WABA_ID
+        sync: false
+      - key: PHONE_NUMBER_ID
+        sync: false
+      - key: VERIFY_TOKEN
+        value: studio_verify_token_2026
+      - key: APP_SECRET
+        value: studio_bot_app_secret_2026
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FERNET_SECRET_KEY
+        sync: false

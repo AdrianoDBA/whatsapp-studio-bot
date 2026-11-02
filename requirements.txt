@@ -1,0 +1,10 @@
+Flask==2.3.3
+gunicorn==21.2.0
+google-generativeai==0.5.4
+qrcode[pil]==7.4.2
+python-dotenv==1.0.0
+cryptography==41.0.5
+requests==2.31.0
+APScheduler==3.10.4
+Flask-Limiter==3.5.0
+Pillow==10.1.0

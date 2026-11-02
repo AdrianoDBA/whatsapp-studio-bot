@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacidade e Proteção de Dados (LGPD) — Bot do Studio</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root { --bg: #0b141a; --panel: #111b21; --card: #202c33; --green: #25D366; --text: #e9edef; --muted: #8696a0; --border: #2a3942; --danger: #ea4335; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main { max-width: 780px; margin: 0 auto; padding: 28px 16px 70px; display: flex; flex-direction: column; gap: 18px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; line-height: 1.6; }
+    h1 { font-size: 24px; color: #fff; }
+    h2 { font-size: 17px; color: var(--green); }
+    p, li { font-size: 14.5px; color: #d1d7db; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/comecar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio</span>
+    </a>
+    <nav>
+      <a href="/comecar">🚀 Começar</a>
+      <a href="{{ dashboard_url }}">📋 Painel</a>
+      <a href="/instalar">📲 Instalar App</a>
+      <a href="/ajuda">❓ Ajuda</a>
+      <a href="/privacidade" class="active">🔒 Privacidade</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h1>🔒 Política de Privacidade e Conformidade LGPD</h1>
+      <p>
+        O <strong>Bot do Studio</strong> respeita integralmente a Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018 — LGPD).
+      </p>
+
+      <h2>1. Finalidade do Tratamento de Dados</h2>
+      <p>
+        Os dados coletados (nome do estúdio, nome do fotógrafo, telefone dos clientes atendidos, histórico de mensagens, transcrições de áudio e horários agendados) são utilizados <strong>exclusivamente para o funcionamento da secretária virtual</strong>, realização de agendamentos e envio de comprovantes solicitados pelo próprio cliente.
+      </p>
+
+      <h2>2. Prazo de Retenção (90 Dias)</h2>
+      <p>
+        Os registros de atendimento e conversas são mantidos pelo período máximo de <strong>90 (noventa) dias</strong> para acompanhamento de agenda e histórico de atendimento, sendo descartados automaticamente após esse período ou imediatamente mediante solicitação de exclusão.
+      </p>
+
+      <h2>3. Criptografia e Proteção</h2>
+      <p>
+        Todas as credenciais de autorização do sistema oficial e transcrições são armazenadas de forma criptografada com chave simétrica segura e nunca são compartilhadas com terceiros.
+      </p>
+
+      <h2>4. Encarregado de Proteção de Dados (DPO)</h2>
+      <ul>
+        <li><strong>Encarregado (DPO):</strong> Equipe de Privacidade e Segurança — Bot do Studio</li>
+        <li><strong>Contato Oficial DPO:</strong> privacidade@whatsapp-studio-bot.antigravity.app</li>
+        <li><strong>Direitos do Titular:</strong> Exportação integral dos dados e exclusão total em 1 clique.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

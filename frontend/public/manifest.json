@@ -1,0 +1,19 @@
+{
+  "name": "Bot do Studio",
+  "short_name": "Bot do Studio",
+  "description": "Atendimento Automático para Fotógrafos - Bot do Studio",
+  "start_url": "/comecar",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111b21",
+  "theme_color": "#25D366",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512 1024x1024",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

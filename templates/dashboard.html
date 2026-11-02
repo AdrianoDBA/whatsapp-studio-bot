@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel do Estúdio — Bot do Studio</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --card: #202c33;
+      --green: #25D366;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --border: #2a3942;
+      --danger: #ea4335;
+      --warn: #fbbc04;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    nav a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 70px; display: flex; flex-direction: column; gap: 18px; }
+    .status-bar {
+      background: var(--card);
+      border: 2px solid var(--green);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .metric-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .metric-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .metric-value { font-size: 28px; font-weight: 900; color: var(--green); margin-top: 4px; }
+    .columns-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .col-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 420px;
+    }
+    .col-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .item-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      padding: 9px 14px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-green { background: var(--green); color: #111b21; }
+    .btn-outline { background: var(--panel); color: #fff; border: 1px solid var(--border); }
+    input[type="checkbox"][switch] { accent-color: #25D366; cursor: pointer; }
+    .tab-nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .tab-btn {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 12px 22px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .tab-btn.active-tab {
+      background: var(--card);
+      color: #fff;
+      border-color: var(--green);
+    }
+    .tab-btn.tab-ig.active-tab {
+      border-color: #E1306C;
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(225, 48, 108, 0.25);
+    }
+    .tab-pane { display: none; flex-direction: column; gap: 18px; }
+    .tab-pane.active-pane { display: flex; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/comecar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio</span>
+    </a>
+    <nav>
+      <a href="/comecar">📲 Conectar meu WhatsApp</a>
+      <a href="{{ dashboard_url }}" class="active">📋 Painel</a>
+      <a href="/onboarding?studio_id={{ studio.id }}">⚙️ Configurar Estúdio</a>
+      <a href="/instalar">📱 Instalar App</a>
+      <a href="/ajuda">❓ Ajuda</a>
+      <a href="/privacidade">🔒 Privacidade</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Abas Unificadas WhatsApp + Instagram -->
+    <div class="tab-nav">
+      <button type="button" class="tab-btn active-tab" id="tabBtnWa" onclick="trocarAbaDashboard('wa')">
+        💬 WhatsApp
+      </button>
+      <button type="button" class="tab-btn tab-ig" id="tabBtnIg" onclick="trocarAbaDashboard('ig')">
+        📸 Instagram
+        {% if metrics.ig_waiting_count %}
+          <span style="background: #E1306C; color: #fff; border-radius: 10px; padding: 2px 7px; font-size: 11px;">{{ metrics.ig_waiting_count }}</span>
+        {% endif %}
+      </button>
+    </div>
+
+    <!-- PAINEL ABA WHATSAPP -->
+    <div class="tab-pane active-pane" id="paneWa">
+    <!-- Barra Única de Controle -->
+    <div class="status-bar" id="statusBar" style="border-color: {% if studio.status in ['PAUSED', 'WAITING_HUMAN'] %}var(--danger, #ea4335){% else %}var(--green){% endif %}; background: {% if studio.status == 'PAUSED' %}rgba(234, 67, 53, 0.08){% else %}var(--card){% endif %};">
+      <div>
+        <h1 style="font-size: 19px; font-weight: 800; color: #fff;">
+          {{ studio.studio_name }} • Secretária <span style="color: var(--green);">{{ studio.secretary_name }}</span>
+        </h1>
+        <p style="font-size: 13.5px; color: var(--muted); margin-top: 3px;">
+          Fotógrafo: <strong style="color: #fff;">{{ studio.photographer_name }}</strong> • Status Geral:
+          <strong id="studioStatusLabel" style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 13px; color: {% if studio.status == 'PAUSED' %}#fff{% elif studio.status == 'WAITING_HUMAN' %}var(--warn){% else %}#111b21{% endif %}; background: {% if studio.status == 'PAUSED' %}#ea4335{% elif studio.status == 'WAITING_HUMAN' %}rgba(251, 188, 4, 0.2){% else %}var(--green){% endif %};">
+            {% if studio.status == 'WAITING_HUMAN' %}
+              ⏸️ Aguardando você (Modo Humano)
+            {% elif studio.status == 'PAUSED' %}
+              🛑 BOT DESLIGADO / SECRETÁRIA PAUSADA
+            {% else %}
+              🟢 ATENDIMENTO 24H LIGADO
+            {% endif %}
+          </strong>
+        </p>
+        {% if studio.status == 'PAUSED' %}
+          <div style="font-size: 12.5px; color: #ff8a80; margin-top: 4px;">
+            ⚠️ Respostas automáticas no WhatsApp e Instagram estão <strong>DESLIGADAS</strong>. Você responde os clientes pessoalmente.
+          </div>
+        {% endif %}
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        {% if studio.status in ['PAUSED', 'WAITING_HUMAN'] %}
+          <button type="button" id="btnToggleBot" class="btn btn-green" style="font-weight: 800; font-size: 14px; padding: 10px 18px;" onclick="alternarStatusSecretaria('ACTIVE')">
+            ▶️ LIGAR SECRETÁRIA
+          </button>
+        {% else %}
+          <button type="button" id="btnToggleBot" class="btn btn-outline" style="border-color: #ea4335; color: #ea4335; font-weight: 800; font-size: 14px; padding: 10px 18px;" onclick="alternarStatusSecretaria('PAUSED')">
+            🛑 DESLIGAR / PAUSAR BOT
+          </button>
+        {% endif %}
+        <button type="button" class="btn btn-outline" style="border-color: var(--green); color: var(--green);" onclick="abrirModalWhatsAppPainel()">
+          📲 Meu WhatsApp / QR Code
+        </button>
+      </div>
+    </div>
+
+    <!-- Topo com Métricas: Leads hoje, Agendamentos, Taxa conversão -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">💬 Leads hoje</div>
+        <div class="metric-value">{{ metrics.leads_today }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">📅 Agendamentos</div>
+        <div class="metric-value">{{ metrics.booked_count }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">📈 Taxa conversão</div>
+        <div class="metric-value">{{ metrics.conversion_rate }}%</div>
+      </div>
+    </div>
+
+    <!-- 3 Colunas Principais -->
+    <div class="columns-3">
+      <!-- COLUNA 1: Conversando agora (com áudio transcrito + teste rápido) -->
+      <section class="col-card">
+        <div class="col-title">
+          <span>💬 Conversando agora</span>
+          <span style="font-size: 12px; color: var(--green);">{{ conversations|length }} conversa(s)</span>
+        </div>
+
+        <!-- Simulador Rápido em 1 Clique -->
+        <form onsubmit="return testarMensagemSimulador(event)" style="display: flex; gap: 8px;">
+          <input
+            type="text"
+            id="simInput"
+            placeholder="Testar conversa (ex: Oi, quero agendar)..."
+            style="flex: 1; background: #2a3942; color: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 13.5px;"
+          />
+          <button type="submit" class="btn btn-green">Enviar</button>
+        </form>
+
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Oi, quais os valores?')">👋 Testar Dúvida</button>
+          <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero agendar o primeiro horário')">📅 Testar Agendamento</button>
+          <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero falar com o fotógrafo')">🙋‍♂️ Pedir Humano</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto;">
+          {% if conversations %}
+            {% for msg in conversations %}
+              <div class="item-box" style="border-left: 3px solid {% if msg.direction == 'out' or msg.direction == 'bot' %}#25D366{% else %}#53bdeb{% endif %};">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+                  <strong>{% if msg.direction == 'out' or msg.direction == 'bot' %}🤖 {{ studio.secretary_name }}{% else %}👤 Cliente ({{ msg.wa_id[-4:] }}){% endif %}</strong>
+                  <span>{{ msg.timestamp }}</span>
+                </div>
+                <div style="font-size: 14px; color: #fff; line-height: 1.4;">{{ msg.content }}</div>
+                {% if msg.transcribed_audio %}
+                  <div style="background: rgba(37, 211, 102, 0.12); padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: #25D366;">
+                    🎙️ <strong>Áudio transcrito:</strong> "{{ msg.transcribed_audio }}"
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <p style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px;">
+              Nenhuma conversa ativa no momento. Use os botões acima para testar!
+            </p>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- COLUNA 2: Precisa de você (WAITING_HUMAN + botão Assumir/Retomar) -->
+      <section class="col-card">
+        <div class="col-title">
+          <span>🚨 Precisa de você</span>
+          <span style="font-size: 12px; color: var(--warn);">{{ waiting_list|length }} pendente(s)</span>
+        </div>
+
+        {% if studio.status == 'WAITING_HUMAN' or waiting_list %}
+          <div class="item-box" style="border: 1px solid var(--warn); background: rgba(251, 188, 4, 0.1);">
+            <div style="font-size: 14px; font-weight: 800; color: var(--warn);">
+              ⏸️ Cliente pediu atendimento pessoal
+            </div>
+            <p style="font-size: 13px; color: #d1d7db; line-height: 1.4;">
+              A secretária pausou as respostas automáticas para você conversar diretamente. Quando terminar, clique em <strong>Retomar</strong>.
+            </p>
+            <div style="display: flex; gap: 8px; margin-top: 6px;">
+              <button type="button" class="btn btn-green" style="flex: 1;" onclick="retomarAtendimentoAutomatico()">
+                ▶️ Retomar Secretária
+              </button>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if waiting_list %}
+          {% for w in waiting_list %}
+            <div class="item-box">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: #fff; font-size: 14px;">👤 {{ w.client_name or ('Cliente ' ~ w.wa_id[-4:]) }}</strong>
+                <span style="font-size: 11.5px; color: var(--warn); font-weight: 700;">Aguardando você</span>
+              </div>
+              <p style="font-size: 13px; color: var(--muted);">{{ w.content }}</p>
+              <div style="display: flex; gap: 8px;">
+                <a href="https://wa.me/{{ w.wa_id }}" target="_blank" rel="noreferrer" class="btn btn-outline" style="text-decoration: none; flex: 1; text-align: center;">
+                  💬 Assumir no WhatsApp
+                </a>
+                <button type="button" class="btn btn-green" onclick="retomarAtendimentoAutomatico('{{ w.wa_id }}')">
+                  ✅ Retomar
+                </button>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px;">
+            Nenhum cliente aguardando atendimento humano agora. Tudo em dia! ☕
+          </p>
+        {% endif %}
+      </section>
+
+      <!-- COLUNA 3: Agendados hoje (com comprovante PNG) -->
+      <section class="col-card">
+        <div class="col-title">
+          <span>📅 Agendados hoje</span>
+          <span style="font-size: 12px; color: var(--green);">{{ booked_slots|length }} reservado(s)</span>
+        </div>
+
+        {% if booked_slots %}
+          {% for slot in booked_slots %}
+            <div class="item-box" style="border: 1px solid var(--green);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: #fff; font-size: 14.5px;">👤 {{ slot.client_name or 'Cliente' }}</strong>
+                <span style="background: rgba(37,211,102,0.2); color: var(--green); padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 800;">
+                  Confirmado
+                </span>
+              </div>
+              <div style="font-size: 13px; color: #d1d7db;">
+                🕒 Horário: <strong>{{ slot.start_at }}</strong>
+              </div>
+              {% if slot.comprovante_id %}
+                <div style="margin-top: 6px;">
+                  <a href="/static/comprovantes/{{ slot.comprovante_id }}.png" target="_blank" style="color: var(--green); font-size: 12.5px; font-weight: 700; text-decoration: none;">
+                    🖼️ Ver Comprovante em Imagem (PNG) →
+                  </a>
+                  <img src="/static/comprovantes/{{ slot.comprovante_id }}.png" alt="Comprovante do Agendamento" style="width: 100%; border-radius: 8px; margin-top: 6px; border: 1px solid var(--border);" />
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 20px 10px;">
+            Nenhum agendamento confirmado ainda.
+          </p>
+        {% endif %}
+
+        <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: auto;">
+          <div style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+            🟢 Próximos Horários Livres na Agenda:
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            {% for free_slot in free_slots[:6] %}
+              <span style="background: var(--panel); border: 1px solid var(--green); color: var(--green); padding: 5px 10px; border-radius: 14px; font-size: 12px; font-weight: 700;">
+                {{ free_slot.start_at }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    </div>
+    </div><!-- Fim paneWa -->
+
+    <!-- PAINEL ABA INSTAGRAM -->
+    <div class="tab-pane" id="paneIg">
+      <div class="status-bar" style="border-color: #E1306C;">
+        <div>
+          <h1 style="font-size: 19px; font-weight: 800; color: #fff;">
+            {{ studio.studio_name }} • Módulo <span style="color: #E1306C;">Instagram 📸</span>
+          </h1>
+          <p style="font-size: 13px; color: var(--muted); margin-top: 2px;">
+            Perfil Conectado: <strong style="color: #25D366; background: rgba(37,211,102,0.15); padding: 2px 8px; border-radius: 6px;">@{{ studio.ig_account_id or 'adrianodba' }} (Ativo ✅)</strong> • Respostas para <strong style="color: #fff;">{{ studio.ig_keywords or 'preço, valor, quanto, quero' }}</strong>
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <a href="/instagram-comecar" class="btn btn-outline" style="border-color: #E1306C; color: #fff; text-decoration: none;">
+            ⚙️ Trocar Conta Instagram
+          </a>
+        </div>
+      </div>
+
+      <!-- Simulador de Comentário e DM do Instagram -->
+      <div class="item-box" style="border: 1px solid #E1306C; background: rgba(225, 48, 108, 0.08); padding: 16px;">
+        <div style="font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 8px;">
+          ⚡ Testar Resposta Automática no Instagram (Simulador em 1 Clique):
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-outline" style="border-color: #E1306C; color: #fff; font-size: 12px; padding: 7px 12px;" onclick="testarInstagramSimulador('comment', 'quanto custa o ensaio gestante?')">
+            💬 Simular Comentário ("quanto custa?")
+          </button>
+          <button type="button" class="btn btn-outline" style="border-color: #f09433; color: #fff; font-size: 12px; padding: 7px 12px;" onclick="testarInstagramSimulador('story', 'quero')">
+            📱 Simular Resposta de Story ("quero")
+          </button>
+          <button type="button" class="btn btn-outline" style="border-color: #53bdeb; color: #fff; font-size: 12px; padding: 7px 12px;" onclick="testarInstagramSimulador('dm', 'Olá, quais os horários livres?')">
+            📩 Simular DM ("quais os horários?")
+          </button>
+          <button type="button" class="btn btn-outline" style="border-color: var(--warn); color: var(--warn); font-size: 12px; padding: 7px 12px;" onclick="testarInstagramSimulador('human', 'Quero falar com o fotógrafo')">
+            🙋‍♂️ Simular DM Pedindo Humano
+          </button>
+        </div>
+      </div>
+
+      <!-- Métricas Instagram -->
+      <div class="metrics-grid">
+        <div class="metric-card" style="border-color: #E1306C;">
+          <div class="metric-label">💬 Comentários viraram DM</div>
+          <div class="metric-value" style="color: #E1306C;">{{ metrics.ig_comments_count }}</div>
+        </div>
+        <div class="metric-card" style="border-color: var(--warn);">
+          <div class="metric-label">🚨 DMs aguardando humano</div>
+          <div class="metric-value" style="color: var(--warn);">{{ metrics.ig_waiting_count }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">⚡ Gatilhos ativos</div>
+          <div class="metric-value" style="font-size: 16px; font-weight: 700; color: var(--green);">Comment, Story & DM</div>
+        </div>
+      </div>
+
+      <!-- 2 Colunas Instagram -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+        <!-- Coluna A: Comentários que Viraram DM -->
+        <section class="col-card" style="border-top: 3px solid #E1306C;">
+          <div class="col-title">
+            <span style="color: #E1306C;">📸 Comentários que viraram DM</span>
+            <span style="font-size: 12px; color: var(--muted);">{{ ig_comments|length }} registrado(s)</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
+            {% if ig_comments %}
+              {% for cmt in ig_comments %}
+                <div class="item-box" style="border-left: 3px solid #E1306C;">
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+                    <strong style="color: #fff;">@{{ cmt.username }}</strong>
+                    <span>{{ cmt.formatted_time }}</span>
+                  </div>
+                  <div style="font-size: 13.5px; color: #d1d7db; margin-top: 4px;">
+                    💬 <em>"{{ cmt.content }}"</em>
+                  </div>
+                  {% if cmt.reply_sent %}
+                    <div style="background: rgba(225, 48, 108, 0.1); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #ff85a2; margin-top: 6px;">
+                      {{ cmt.reply_sent }}
+                    </div>
+                  {% endif %}
+                  <div style="margin-top: 8px; text-align: right;">
+                    <a href="https://ig.me/m/{{ cmt.username }}" target="_blank" rel="noreferrer" class="btn btn-outline" style="font-size: 11.5px; padding: 5px 10px; text-decoration: none; border-color: #E1306C; color: #fff;">
+                      📸 Ver no Instagram
+                    </a>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 30px 10px;">
+                Nenhum comentário detectado ainda. Quando comentarem "preço" ou "quanto", aparecerão aqui!
+              </p>
+            {% endif %}
+          </div>
+        </section>
+
+        <!-- Coluna B: DMs Pendentes / Histórico Recente -->
+        <section class="col-card" style="border-top: 3px solid var(--warn);">
+          <div class="col-title">
+            <span>🚨 DMs Pendentes & Interações</span>
+            <span style="font-size: 12px; color: var(--warn);">{{ ig_waiting|length }} pendente(s)</span>
+          </div>
+
+          {% if ig_waiting %}
+            {% for iw in ig_waiting %}
+              <div class="item-box" style="border: 1px solid var(--warn); background: rgba(251, 188, 4, 0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="color: #fff; font-size: 14px;">@{{ iw.username }}</strong>
+                  <span style="font-size: 11px; color: var(--warn); font-weight: 800; background: rgba(251, 188, 4, 0.2); padding: 2px 6px; border-radius: 6px;">Aguardando Humano</span>
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 8px;">
+                  <a href="https://ig.me/m/{{ iw.username }}" target="_blank" rel="noreferrer" class="btn btn-outline" style="flex: 1; text-align: center; text-decoration: none; border-color: #E1306C; color: #fff;">
+                    📸 Abrir DM no Instagram
+                  </a>
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <div style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 10px; margin-bottom: 6px;">
+            Histórico Recente de DMs & Stories:
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto;">
+            {% if ig_recent_events %}
+              {% for ev in ig_recent_events %}
+                <div class="item-box" style="padding: 10px 12px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted);">
+                    <strong style="color: #fff;">@{{ ev.username }} ({{ ev.type }})</strong>
+                    <span>{{ ev.formatted_time }}</span>
+                  </div>
+                  <div style="font-size: 13px; color: #d1d7db; margin-top: 3px;">{{ ev.content }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px 10px;">
+                Nenhuma DM registrada ainda.
+              </p>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+    </div><!-- Fim paneIg -->
+  </main>
+
+  <dialog id="modalPainelWa" style="margin: auto; background: var(--card); color: var(--text); border: 2px solid var(--green); border-radius: 18px; padding: 24px; max-width: 440px; width: calc(100% - 32px); text-align: center;">
+    <h3 id="waModalTitle" style="color: #25D366; font-size: 19px; margin-bottom: 10px;">📲 Status do seu WhatsApp</h3>
+    <p id="waModalText" style="font-size: 14px; color: #d1d7db; margin-bottom: 14px; line-height: 1.45;">
+      Verificando conexão do seu aparelho...
+    </p>
+    <div id="waModalQrBox" style="display: none; margin: 12px auto; background: #fff; padding: 14px; border-radius: 14px; width: fit-content;">
+      <img id="waModalQrImg" src="" alt="QR WhatsApp" style="width: 220px; height: 220px; display: block;" />
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+      <button type="button" class="btn btn-green" onclick="gerarNovoQrNoPainel()">
+        🔄 Trocar Celular / Gerar Novo QR Code
+      </button>
+      <button type="button" class="btn btn-outline" onclick="fecharModalWaPainel()">
+        Fechar janela
+      </button>
+    </div>
+  </dialog>
+
+  <script>
+    const STUDIO_ID = '{{ studio.id }}';
+    let painelQrTimer = null;
+
+    function trocarAbaDashboard(aba) {
+      const btnWa = document.getElementById('tabBtnWa');
+      const btnIg = document.getElementById('tabBtnIg');
+      const paneWa = document.getElementById('paneWa');
+      const paneIg = document.getElementById('paneIg');
+
+      if (aba === 'ig') {
+        btnWa.classList.remove('active-tab');
+        btnIg.classList.add('active-tab');
+        paneWa.classList.remove('active-pane');
+        paneIg.classList.add('active-pane');
+      } else {
+        btnIg.classList.remove('active-tab');
+        btnWa.classList.add('active-tab');
+        paneIg.classList.remove('active-pane');
+        paneWa.classList.add('active-pane');
+      }
+    }
+
+    async function alternarStatusSecretaria(novoStatus) {
+      const btn = document.getElementById('btnToggleBot');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Salvando alteração...';
+      }
+      try {
+        const resp = await fetch('/dashboard/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID || 'studio-principal', status: novoStatus })
+        });
+        if (resp.ok) {
+          window.location.reload();
+        } else {
+          alert('Erro ao atualizar status do bot. Tente novamente.');
+          if (btn) btn.disabled = false;
+        }
+      } catch (e) {
+        alert('Erro de conexão ao alterar status do bot.');
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function retomarAtendimentoAutomatico(waId) {
+      try {
+        await fetch('/dashboard/retomar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID, wa_id: waId || '' })
+        });
+        window.location.reload();
+      } catch (e) {}
+    }
+
+    function fecharModalWaPainel() {
+      if (painelQrTimer) clearInterval(painelQrTimer);
+      document.getElementById('modalPainelWa').close();
+    }
+
+    async function atualizarStatusWaNoPainel() {
+      const title = document.getElementById('waModalTitle');
+      const txt = document.getElementById('waModalText');
+      const qrBox = document.getElementById('waModalQrBox');
+      const qrImg = document.getElementById('waModalQrImg');
+      try {
+        const res = await fetch('/status-conexao');
+        const data = await res.json();
+        if (data && data.status === 'CONNECTED') {
+          const num = data.connectedNumber ? ('+' + data.connectedNumber) : 'Seu WhatsApp';
+          title.textContent = '✅ WhatsApp Conectado!';
+          txt.innerHTML = 'Aparelho conectado: <strong>' + num + '</strong>.<br/>Para conectar outro número, clique no botão abaixo para gerar um novo QR Code.';
+          qrBox.style.display = 'none';
+          return;
+        }
+        if (data && data.qr) {
+          title.textContent = '📲 Escaneie o QR Code no WhatsApp';
+          txt.textContent = 'Abra o WhatsApp no celular > Aparelhos Conectados > Conectar Aparelho:';
+          qrImg.src = data.qr;
+          qrBox.style.display = 'block';
+          return;
+        }
+        title.textContent = '⏳ Gerando QR Code...';
+        txt.textContent = 'Aguarde alguns segundos...';
+      } catch (e) {}
+    }
+
+    async function abrirModalWhatsAppPainel() {
+      const modal = document.getElementById('modalPainelWa');
+      if (!modal.open) modal.showModal();
+      await atualizarStatusWaNoPainel();
+      if (painelQrTimer) clearInterval(painelQrTimer);
+      painelQrTimer = setInterval(atualizarStatusWaNoPainel, 2500);
+    }
+
+    async function gerarNovoQrNoPainel() {
+      document.getElementById('waModalTitle').textContent = '🔄 Gerando Novo QR Code...';
+      document.getElementById('waModalText').textContent = 'Desconectando aparelho anterior e preparando novo QR Code...';
+      document.getElementById('waModalQrBox').style.display = 'none';
+      try {
+        await fetch('/desconectar-whatsapp', { method: 'POST' });
+      } catch (e) {}
+      setTimeout(atualizarStatusWaNoPainel, 1800);
+    }
+
+    async function enviarAtalho(texto) {
+      document.getElementById('simInput').value = texto;
+      await enviarSimulacao(texto);
+    }
+
+    async function testarMensagemSimulador(event) {
+      event.preventDefault();
+      const input = document.getElementById('simInput');
+      const texto = input.value.trim();
+      if (!texto) return false;
+      input.value = '';
+      await enviarSimulacao(texto);
+      return false;
+    }
+
+    async function enviarSimulacao(texto) {
+      try {
+        await fetch('/simular-conversa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studio_id: STUDIO_ID,
+            wa_id: '5534999991234',
+            name: 'Cliente Teste',
+            text: texto
+          })
+        });
+        window.location.reload();
+      } catch (e) {}
+    }
+    async function testarInstagramSimulador(tipo, texto) {
+      try {
+        let payload = {};
+        if (tipo === 'comment') {
+          payload = {
+            entry: [{
+              changes: [{
+                field: 'comments',
+                value: {
+                  id: 'cmt_sim_' + Date.now(),
+                  text: texto,
+                  from: { id: 'ig_sim_user_01', username: 'cliente_instagram' }
+                }
+              }]
+            }]
+          };
+        } else if (tipo === 'story') {
+          payload = {
+            type: 'story_reply',
+            ig_id: 'ig_sim_story_02',
+            username: 'amanda_story',
+            text: texto
+          };
+        } else if (tipo === 'human') {
+          payload = {
+            ig_id: 'ig_sim_human_03',
+            username: 'marcos_humano',
+            text: texto
+          };
+        } else {
+          payload = {
+            ig_id: 'ig_sim_dm_04',
+            username: 'julia_dm',
+            text: texto
+          };
+        }
+
+        await fetch('/simular-instagram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        localStorage.setItem('active_dash_tab', 'ig');
+        window.location.reload();
+      } catch (e) {}
+    }
+
+    if (localStorage.getItem('active_dash_tab') === 'ig') {
+      trocarAbaDashboard('ig');
+      localStorage.removeItem('active_dash_tab');
+    }
+  </script>
+</body>
+</html>

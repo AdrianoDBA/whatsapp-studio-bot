@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot do Studio — Seu estúdio atendendo sozinho, 24h</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --card: #202c33;
+      --green: #25D366;
+      --green-dark: #1ebd5b;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --border: #2a3942;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    nav a {
+      text-decoration: none;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+    }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px 90px;
+      gap: 24px;
+    }
+    .hero-card {
+      background: var(--card);
+      border: 2px solid var(--green);
+      border-radius: 22px;
+      padding: 38px 28px;
+      max-width: 620px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 16px 44px rgba(0,0,0,0.45);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+    .logo-badge {
+      width: 68px;
+      height: 68px;
+      border-radius: 20px;
+      background: rgba(37, 211, 102, 0.16);
+      border: 2px solid var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+    }
+    h1 {
+      font-size: clamp(25px, 5vw, 34px);
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+    .subtitle {
+      font-size: clamp(15px, 3vw, 18px);
+      color: #d1d7db;
+      line-height: 1.5;
+      max-width: 520px;
+    }
+    .btn-connect {
+      background-color: #25D366;
+      color: #111b21;
+      font-size: clamp(17px, 4vw, 21px);
+      font-weight: 900;
+      padding: 22px 32px;
+      border-radius: 16px;
+      border: none;
+      width: 100%;
+      max-width: 460px;
+      cursor: pointer;
+      box-shadow: 0 8px 26px rgba(37, 211, 102, 0.4);
+      transition: transform 0.15s ease, background-color 0.2s ease;
+    }
+    .btn-connect:hover { background-color: var(--green-dark); transform: translateY(-1px); }
+    .steps-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      width: 100%;
+      margin-top: 6px;
+    }
+    .step-pill {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 12px 10px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .step-pill span { color: var(--green); display: block; font-size: 12px; margin-bottom: 2px; }
+    small.microcopy {
+      color: var(--muted);
+      font-size: 13.5px;
+      display: block;
+    }
+    .qr-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      max-width: 620px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .qr-box {
+      background: #ffffff;
+      padding: 12px;
+      border-radius: 14px;
+      display: inline-block;
+    }
+    .qr-box img { width: 170px; height: 170px; display: block; }
+    .float-wa {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #25D366;
+      color: #111b21;
+      padding: 13px 20px;
+      border-radius: 50px;
+      font-weight: 800;
+      font-size: 14px;
+      text-decoration: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      border: 2px solid #fff;
+      z-index: 99;
+    }
+    dialog {
+      margin: auto;
+      background: var(--card);
+      color: var(--text);
+      border: 2px solid var(--green);
+      border-radius: 18px;
+      padding: 24px;
+      max-width: 440px;
+      width: calc(100% - 32px);
+      text-align: center;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.7); }
+  </style>
+  <script>
+    window.fbAsyncInit = function() {
+      if (window.FB) {
+        window.FB.init({
+          appId: '{{ whatsapp_app_id }}',
+          cookie: true,
+          xfbml: true,
+          version: 'v20.0'
+        });
+      }
+    };
+  </script>
+  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+</head>
+<body>
+  <header>
+    <a href="/comecar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio</span>
+    </a>
+    <nav>
+      <a href="/comecar" class="active">🚀 Começar</a>
+      <a href="{{ dashboard_url }}">📋 Painel</a>
+      <a href="/onboarding?studio_id={{ studio.id }}">⚙️ Meu Estúdio</a>
+      <a href="/instalar">📲 Instalar App</a>
+      <a href="/ajuda">❓ Ajuda</a>
+      <a href="/privacidade">🔒 Privacidade</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero-card">
+      <div class="logo-badge">📸</div>
+      <h1>Seu estúdio atendendo sozinho, 24h</h1>
+      <p class="subtitle">
+        Conecte seu WhatsApp em 1 clique e deixe sua secretária virtual responder, agendar e mandar comprovante
+      </p>
+
+      <button type="button" class="btn-connect" id="btnConnect" onclick="iniciarConexaoUmClique()">
+        CONECTAR MEU WHATSAPP →
+      </button>
+
+      <div class="steps-row">
+        <div class="step-pill">
+          <span>Passo 1</span>
+          1-Clique
+        </div>
+        <div class="step-pill">
+          <span>Passo 2</span>
+          2-Confirme seu número
+        </div>
+        <div class="step-pill">
+          <span>Passo 3</span>
+          3-Pronto
+        </div>
+      </div>
+
+      <small class="microcopy">Não precisa digitar código. Leva 23 segundos</small>
+      <small class="microcopy" style="color: #25D366; font-weight: 600;">
+        Funciona junto com seu WhatsApp normal, não apaga nada
+      </small>
+    </div>
+
+    <div class="qr-section">
+      <h2 style="font-size: 16px; color: #fff;">📱 Abrir no Celular ou Colar no Estúdio</h2>
+      <p style="font-size: 13.5px; color: var(--muted);">
+        Escaneie o código abaixo para abrir esta página instantaneamente no celular:
+      </p>
+      <div class="qr-box">
+        <img src="/static/qr-comecar.png" alt="QR Code para começar" />
+      </div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px;">
+        <a href="{{ dashboard_url }}" style="background: var(--panel); color: #fff; text-decoration: none; padding: 10px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--border);">
+          💻 Abrir Painel no Computador
+        </a>
+        <a href="/instalar" style="background: var(--panel); color: var(--green); text-decoration: none; padding: 10px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--green);">
+          📱 Instalar Aplicativo no Celular
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="modalConexao">
+    <h3 id="modalTitle" style="color: #25D366; font-size: 20px; margin-bottom: 10px;">📲 Conectar seu WhatsApp</h3>
+    <p style="font-size: 14.5px; color: #d1d7db; margin-bottom: 14px; line-height: 1.45;" id="modalStatusText">
+      Verificando conexão do seu WhatsApp e ativando sua secretária virtual...
+    </p>
+    <div id="qrGatewayBox" style="display: none; margin: 12px auto; background: #fff; padding: 14px; border-radius: 14px; width: fit-content;">
+      <img id="qrGatewayImg" src="" alt="QR WhatsApp" style="width: 220px; height: 220px; display: block;" />
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+      <a href="{{ dashboard_url }}" id="btnGoPainel" style="background: #25D366; color: #111b21; text-decoration: none; padding: 14px; border-radius: 10px; font-weight: 900; font-size: 15.5px;">
+        📋 Abrir Painel de Controle Agora →
+      </a>
+      <button type="button" id="btnTrocarQr" onclick="gerarNovoQrWhatsApp()" style="background: var(--panel); color: #fff; border: 1px solid var(--green); padding: 12px; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: pointer;">
+        🔄 Conectar Outro Celular / Gerar Novo QR Code
+      </button>
+      <a href="/onboarding?studio_id={{ studio.id }}" style="background: var(--panel); color: var(--muted); text-decoration: none; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 13px; border: 1px solid var(--border);">
+        ⚙️ Editar Nome e Preços do Estúdio
+      </a>
+      <button type="button" onclick="fecharModalConexao()" style="background: transparent; color: var(--muted); border: none; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 13px;">
+        Fechar janela
+      </button>
+    </div>
+  </dialog>
+
+  <a href="https://wa.me/5534988412981?text=Oi!%20Preciso%20de%20ajuda%20no%20Bot%20do%20Studio" target="_blank" rel="noreferrer" class="float-wa">
+    💬 Precisa de ajuda? Fala comigo
+  </a>
+
+  <script>
+    const ROTA_CONEXAO_OFICIAL = '{{ rota_conexao }}';
+    const STUDIO_ID = '{{ studio.id }}';
+    let qrPollTimer = null;
+
+    function fecharModalConexao() {
+      if (qrPollTimer) clearInterval(qrPollTimer);
+      document.getElementById('modalConexao').close();
+      const btn = document.getElementById('btnConnect');
+      if (btn) btn.textContent = 'CONECTAR MEU WHATSAPP →';
+    }
+
+    async function iniciarConexaoUmClique() {
+      const btn = document.getElementById('btnConnect');
+      btn.textContent = 'ATIVANDO SUA SECRETÁRIA...';
+
+      // Liga o bot imediatamente em 1 clique
+      try {
+        await fetch('/bot/ativar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID, paused: false, status: 'ACTIVE' })
+        });
+      } catch (e) {}
+
+      // Tenta fluxo oficial do Facebook se disponível e ativo
+      if (window.ENABLE_FB_LOGIN && window.FB && typeof window.FB.login === 'function') {
+        try {
+          window.FB.login(function(response) {
+            if (response && response.authResponse) {
+              const codigoAutorizacao = response.authResponse.code || 'one_click_connected';
+              window.location.href = ROTA_CONEXAO_OFICIAL + '?code=' + encodeURIComponent(codigoAutorizacao) + '&studio_id=' + encodeURIComponent(STUDIO_ID);
+            } else {
+              abrirConexaoDireta();
+            }
+          }, {
+            scope: 'business_management,whatsapp_business_management',
+            response_type: 'code'
+          });
+          return;
+        } catch (err) {}
+      }
+
+      await abrirConexaoDireta();
+    }
+
+    async function atualizarEstadoModal() {
+      const modal = document.getElementById('modalConexao');
+      const title = document.getElementById('modalTitle');
+      const qrBox = document.getElementById('qrGatewayBox');
+      const qrImg = document.getElementById('qrGatewayImg');
+      const statusTxt = document.getElementById('modalStatusText');
+      const btn = document.getElementById('btnConnect');
+
+      try {
+        const res = await fetch('/status-conexao?auto_start=1');
+        const data = await res.json();
+        if (data && data.status === 'CONNECTED') {
+          const num = data.connectedNumber ? ('+' + data.connectedNumber) : 'Seu WhatsApp';
+          title.textContent = '✅ WhatsApp Conectado e Ativo!';
+          statusTxt.innerHTML = 'Seu número <strong>' + num + '</strong> já está conectado e sua secretária virtual está respondendo os clientes automaticamente!';
+          qrBox.style.display = 'none';
+          if (btn) btn.textContent = '✅ WHATSAPP CONECTADO (' + num + ')';
+          return;
+        }
+        if (data && data.qr) {
+          title.textContent = '📲 Escaneie o QR Code no seu WhatsApp';
+          statusTxt.textContent = 'No seu celular, abra o WhatsApp > Aparelhos Conectados > Conectar um Aparelho e aponte a câmera:';
+          qrImg.src = data.qr;
+          qrBox.style.display = 'block';
+          return;
+        }
+        title.textContent = '⏳ Gerando QR Code do WhatsApp...';
+        statusTxt.textContent = 'Aguarde alguns segundos enquanto preparamos a leitura do seu celular...';
+      } catch (e) {}
+    }
+
+    async function abrirConexaoDireta() {
+      const modal = document.getElementById('modalConexao');
+      if (!modal.open) modal.showModal();
+      await atualizarEstadoModal();
+      if (qrPollTimer) clearInterval(qrPollTimer);
+      qrPollTimer = setInterval(atualizarEstadoModal, 2500);
+    }
+
+    async function gerarNovoQrWhatsApp() {
+      const title = document.getElementById('modalTitle');
+      const statusTxt = document.getElementById('modalStatusText');
+      const qrBox = document.getElementById('qrGatewayBox');
+      title.textContent = '🔄 Preparando Novo QR Code...';
+      statusTxt.textContent = 'Desconectando sessão anterior e gerando um novo QR Code para você escanear...';
+      qrBox.style.display = 'none';
+      try {
+        await fetch('/desconectar-whatsapp', { method: 'POST' });
+      } catch (e) {}
+      setTimeout(atualizarEstadoModal, 1800);
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

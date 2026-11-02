@@ -1,0 +1,108 @@
+:root {
+  --wa-bg: #0b141a;
+  --wa-panel: #111b21;
+  --wa-card: #202c33;
+  --wa-card-hover: #222e35;
+  --wa-green: #25D366;
+  --wa-green-hover: #1ebd5b;
+  --wa-teal: #00a884;
+  --wa-text: #e9edef;
+  --wa-muted: #8696a0;
+  --wa-border: #2a3942;
+  --wa-input-bg: #2a3942;
+  --wa-danger: #ea4335;
+  --wa-blue: #53bdeb;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--wa-bg);
+  color: var(--wa-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 14.5px;
+  background-color: var(--wa-input-bg);
+  color: var(--wa-text);
+  border: 1px solid var(--wa-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--wa-green);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--wa-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--wa-border);
+  border-radius: 3px;
+}
+
+/* Native Modal Dialog with Backdrop */
+dialog {
+  margin: auto;
+  border: 2px solid var(--wa-green);
+  border-radius: 16px;
+  background-color: var(--wa-card);
+  color: var(--wa-text);
+  padding: 24px;
+  max-width: 480px;
+  width: calc(100% - 32px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(3px);
+}
+
+/* Native HTML Switch Control */
+input[type="checkbox"][switch] {
+  accent-color: var(--accent-color, #25D366);
+  margin: 0;
+  cursor: pointer;
+}
+
+input[type="checkbox"][switch]:focus-visible {
+  outline: 3px solid var(--focus-color, #ff8c00);
+  outline-offset: 4px;
+}
+
