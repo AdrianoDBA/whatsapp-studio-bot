@@ -496,7 +496,10 @@ def ensure_qr_comecar():
 
 def process_niche_photos(photos_dict: dict) -> dict:
     """Comprime fotos base64 com Pillow para no máximo 800px e 70% qualidade, estruturando por nicho."""
-    processed = {"gestante": [], "newborn": [], "familia": []}
+    target_niches = ALL_SUPPORTED_NICHES if 'ALL_SUPPORTED_NICHES' in globals() else [
+        "gestante", "newborn", "familia", "casamento", "formatura", "casal", "corporativo", "15anos"
+    ]
+    processed = {n: [] for n in target_niches}
     if not isinstance(photos_dict, dict):
         return processed
     
