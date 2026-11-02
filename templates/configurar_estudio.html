@@ -240,13 +240,11 @@
           <div class="niche-header">
             <label class="niche-toggle-label">
               <input type="checkbox" id="toggle_gestante" onchange="alternarBlocoNicho('gestante')" {% if 'gestante' in active_niches %}checked{% endif %} />
-              <span>🤰 Atuo com Ensaio Gestante</span>
+              <span>🤰 Ensaio Gestante</span>
             </label>
             <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
           </div>
-          <div class="photos-grid" id="grid_gestante">
-            <!-- 3 slots -->
-          </div>
+          <div class="photos-grid" id="grid_gestante"></div>
         </div>
 
         <!-- Bloco 2: Newborn -->
@@ -254,13 +252,11 @@
           <div class="niche-header">
             <label class="niche-toggle-label">
               <input type="checkbox" id="toggle_newborn" onchange="alternarBlocoNicho('newborn')" {% if 'newborn' in active_niches %}checked{% endif %} />
-              <span>👶 Atuo com Ensaio Newborn</span>
+              <span>👶 Ensaio Newborn</span>
             </label>
             <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
           </div>
-          <div class="photos-grid" id="grid_newborn">
-            <!-- 3 slots -->
-          </div>
+          <div class="photos-grid" id="grid_newborn"></div>
         </div>
 
         <!-- Bloco 3: Família -->
@@ -268,13 +264,71 @@
           <div class="niche-header">
             <label class="niche-toggle-label">
               <input type="checkbox" id="toggle_familia" onchange="alternarBlocoNicho('familia')" {% if 'familia' in active_niches %}checked{% endif %} />
-              <span>👨‍👩‍👧 Atuo com Ensaio Família</span>
+              <span>👨‍👩‍👧 Ensaio Família</span>
             </label>
             <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
           </div>
-          <div class="photos-grid" id="grid_familia">
-            <!-- 3 slots -->
+          <div class="photos-grid" id="grid_familia"></div>
+        </div>
+
+        <!-- Bloco 4: Casamento -->
+        <div class="niche-block" id="block_casamento">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_casamento" onchange="alternarBlocoNicho('casamento')" {% if 'casamento' in active_niches %}checked{% endif %} />
+              <span>💍 Ensaio Casamento & Pré-Wedding</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
           </div>
+          <div class="photos-grid" id="grid_casamento"></div>
+        </div>
+
+        <!-- Bloco 5: Formatura -->
+        <div class="niche-block" id="block_formatura">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_formatura" onchange="alternarBlocoNicho('formatura')" {% if 'formatura' in active_niches %}checked{% endif %} />
+              <span>🎓 Ensaio Formatura & Becas</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_formatura"></div>
+        </div>
+
+        <!-- Bloco 6: Casal -->
+        <div class="niche-block" id="block_casal">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_casal" onchange="alternarBlocoNicho('casal')" {% if 'casal' in active_niches %}checked{% endif %} />
+              <span>❤️ Ensaio Casal & Namorados</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_casal"></div>
+        </div>
+
+        <!-- Bloco 7: Corporativo -->
+        <div class="niche-block" id="block_corporativo">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_corporativo" onchange="alternarBlocoNicho('corporativo')" {% if 'corporativo' in active_niches %}checked{% endif %} />
+              <span>💼 Retrato Corporativo & Profissional</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_corporativo"></div>
+        </div>
+
+        <!-- Bloco 8: 15 Anos -->
+        <div class="niche-block" id="block_15anos">
+          <div class="niche-header">
+            <label class="niche-toggle-label">
+              <input type="checkbox" id="toggle_15anos" onchange="alternarBlocoNicho('15anos')" {% if '15anos' in active_niches %}checked{% endif %} />
+              <span>👑 Ensaio 15 Anos & Debutante</span>
+            </label>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+          </div>
+          <div class="photos-grid" id="grid_15anos"></div>
         </div>
       </div>
 
@@ -301,18 +355,16 @@
 
   <script>
     const DASHBOARD_CHAVE = '{{ studio.dashboard_token }}';
-    let fotosData = {
-      gestante: [],
-      newborn: [],
-      familia: []
-    };
+    const ALL_NICHES = ['gestante', 'newborn', 'familia', 'casamento', 'formatura', 'casal', 'corporativo', '15anos'];
+    let fotosData = {};
+    ALL_NICHES.forEach(n => { fotosData[n] = []; });
 
     try {
       const initPhotos = {{ photos|tojson }};
       const parsed = typeof initPhotos === 'string' ? JSON.parse(initPhotos) : (initPhotos || {});
-      if (parsed.gestante) fotosData.gestante = parsed.gestante;
-      if (parsed.newborn) fotosData.newborn = parsed.newborn;
-      if (parsed.familia) fotosData.familia = parsed.familia;
+      ALL_NICHES.forEach(n => {
+        if (parsed[n]) fotosData[n] = parsed[n];
+      });
       if (parsed['família']) fotosData.familia = parsed['família'];
     } catch (e) {}
 
@@ -404,9 +456,10 @@
       }
 
       const activeNiches = [];
-      if (document.getElementById('toggle_gestante').checked) activeNiches.push('gestante');
-      if (document.getElementById('toggle_newborn').checked) activeNiches.push('newborn');
-      if (document.getElementById('toggle_familia').checked) activeNiches.push('familia');
+      ALL_NICHES.forEach(n => {
+        const el = document.getElementById('toggle_' + n);
+        if (el && el.checked) activeNiches.push(n);
+      });
 
       if (activeNiches.length === 0) {
         alert('Por favor, selecione ao menos um nicho de atendimento ativo.');

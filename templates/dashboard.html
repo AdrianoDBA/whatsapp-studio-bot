@@ -709,59 +709,36 @@
         </a>
       </div>
 
-      <!-- Gestante -->
-      <div class="studio-gallery-niche">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="color: #fff; font-size: 15px;">🤰 Fotos do Ensaio Gestante (Até 3)</strong>
-          <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
-        </div>
-        <div class="gallery-slots">
-          {% for img in photos_by_niche.get('gestante', [])[:3] %}
-            <div class="gallery-img-box">
-              <img src="{{ img }}" alt="Gestante" />
-              {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
-            </div>
-          {% else %}
-            <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
-          {% endfor %}
-        </div>
-      </div>
+      <!-- Nichos Dinâmicos e Portfólio -->
+      {% set all_display_niches = [
+        ('gestante', '🤰 Ensaio Gestante'),
+        ('newborn', '👶 Ensaio Newborn'),
+        ('familia', '👨‍👩‍👧 Ensaio Família'),
+        ('casamento', '💍 Ensaio Casamento & Pré-Wedding'),
+        ('formatura', '🎓 Ensaio Formatura & Becas'),
+        ('casal', '❤️ Ensaio Casal & Namorados'),
+        ('corporativo', '💼 Retrato Corporativo'),
+        ('15anos', '👑 Ensaio 15 Anos & Debutante')
+      ] %}
 
-      <!-- Newborn -->
-      <div class="studio-gallery-niche">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="color: #fff; font-size: 15px;">👶 Fotos do Ensaio Newborn (Até 3)</strong>
-          <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
+      {% for n_key, n_title in all_display_niches %}
+        <div class="studio-gallery-niche">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #fff; font-size: 15px;">{{ n_title }} (Até 3 Fotos)</strong>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
+          </div>
+          <div class="gallery-slots">
+            {% for img in photos_by_niche.get(n_key, [])[:3] %}
+              <div class="gallery-img-box">
+                <img src="{{ img }}" alt="{{ n_title }}" />
+                {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
+              </div>
+            {% else %}
+              <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="gallery-slots">
-          {% for img in photos_by_niche.get('newborn', [])[:3] %}
-            <div class="gallery-img-box">
-              <img src="{{ img }}" alt="Newborn" />
-              {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
-            </div>
-          {% else %}
-            <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Família -->
-      <div class="studio-gallery-niche">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="color: #fff; font-size: 15px;">👨‍👩‍👧 Fotos do Ensaio Família (Até 3)</strong>
-          <span style="font-size: 12px; color: var(--green); font-weight: 700;">Enviadas pela IA</span>
-        </div>
-        <div class="gallery-slots">
-          {% for img in photos_by_niche.get('familia', [])[:3] %}
-            <div class="gallery-img-box">
-              <img src="{{ img }}" alt="Família" />
-              {% if '/static/demo_photos/' in img %}<span class="gallery-tag">Foto de Teste</span>{% endif %}
-            </div>
-          {% else %}
-            <div class="gallery-img-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Sem fotos</div>
-          {% endfor %}
-        </div>
-      </div>
+      {% endfor %}
     </div><!-- Fim paneStudio -->
 
     <!-- ABA 4: INSTAGRAM -->

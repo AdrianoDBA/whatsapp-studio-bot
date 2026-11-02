@@ -514,7 +514,8 @@ def process_niche_photos(photos_dict: dict) -> dict:
         else:
             norm_map[k_norm] = v
 
-    for niche in ["gestante", "newborn", "familia"]:
+    target_niches = ALL_SUPPORTED_NICHES if 'ALL_SUPPORTED_NICHES' in globals() else ["gestante", "newborn", "familia", "casamento", "formatura", "casal", "corporativo", "15anos"]
+    for niche in target_niches:
         items = norm_map.get(niche) or []
         for item in items[:3]:
             if not item or not isinstance(item, str):
@@ -537,6 +538,17 @@ def process_niche_photos(photos_dict: dict) -> dict:
     return processed
 
 
+ALL_SUPPORTED_NICHES = [
+    "gestante",
+    "newborn",
+    "familia",
+    "casamento",
+    "formatura",
+    "casal",
+    "corporativo",
+    "15anos"
+]
+
 DEFAULT_DEMO_PHOTOS = {
     "gestante": [
         "/static/demo_photos/gestante_1.jpg",
@@ -552,18 +564,43 @@ DEFAULT_DEMO_PHOTOS = {
         "/static/demo_photos/familia_1.jpg",
         "/static/demo_photos/familia_2.jpg",
         "/static/demo_photos/familia_3.jpg"
+    ],
+    "casamento": [
+        "/static/demo_photos/casamento_1.jpg",
+        "/static/demo_photos/casamento_2.jpg",
+        "/static/demo_photos/casamento_3.jpg"
+    ],
+    "formatura": [
+        "/static/demo_photos/formatura_1.jpg",
+        "/static/demo_photos/formatura_2.jpg",
+        "/static/demo_photos/formatura_3.jpg"
+    ],
+    "casal": [
+        "/static/demo_photos/casal_1.jpg",
+        "/static/demo_photos/casal_2.jpg",
+        "/static/demo_photos/casal_3.jpg"
+    ],
+    "corporativo": [
+        "/static/demo_photos/corporativo_1.jpg",
+        "/static/demo_photos/corporativo_2.jpg",
+        "/static/demo_photos/corporativo_3.jpg"
+    ],
+    "15anos": [
+        "/static/demo_photos/15anos_1.jpg",
+        "/static/demo_photos/15anos_2.jpg",
+        "/static/demo_photos/15anos_3.jpg"
     ]
 }
 
 def ensure_demo_photos(photos_dict: dict) -> dict:
-    result = {"gestante": [], "newborn": [], "familia": []}
+    result = {k: [] for k in ALL_SUPPORTED_NICHES}
     if not isinstance(photos_dict, dict):
         photos_dict = {}
-    for niche in ["gestante", "newborn", "familia"]:
+    for niche in ALL_SUPPORTED_NICHES:
         items = photos_dict.get(niche) or []
         valid_items = [p for p in items if p and isinstance(p, str)]
         if not valid_items:
-            result[niche] = DEFAULT_DEMO_PHOTOS[niche].copy()
+            result[niche] = DEFAULT_DEMO_PHOTOS.get(niche, []).copy()
         else:
             result[niche] = valid_items[:3]
     return result
@@ -993,10 +1030,11 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         "gestante": "Gestante",
         "newborn": "Newborn",
         "familia": "Família",
-        "casal": "Casal",
         "casamento": "Casamento",
         "formatura": "Formatura",
-        "corporativo": "Corporativo"
+        "casal": "Casal",
+        "corporativo": "Corporativo",
+        "15anos": "15 Anos"
     }
     available_niches_labels = [niche_names_map.get(n.lower(), n.title()) for n in active_niches]
     niches_formatted = ", ".join(available_niches_labels) if available_niches_labels else "Gestante, Newborn e Família"
@@ -1077,13 +1115,15 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         conn.close()
         return limit_to_one_emoji(reply), png_url, False, ["Ver Outros Dias", "Tirar Dúvida", "Falar com Fotógrafo"]
 
-    # 4b. Se o cliente pediu para ver ensaios / fotos / portfólio / estilos
+    # 4b. Se o cliente pediu para ver ensaios / fotos / portfólio / estilos / nichos específicos
     ensaio_triggers = [
         "ensaio", "ensaios", "ver ensaio", "ver ensaios", "ver foto", "ver fotos",
         "foto", "fotos", "portfólio", "portfolio", "trabalhos", "estilos", "modelos",
-        "casal", "gestante", "casamento", "corporativo", "newborn", "família", "familia", "formatura", "exemplo"
+        "casal", "gestante", "casamento", "corporativo", "newborn", "família", "familia",
+        "formatura", "15anos", "15 anos", "debutante", "exemplo"
     ]
-    if any(re.search(rf"{re.escape(w)}", low) for w in ensaio_triggers):
+    is_ensaio_request = any(re.search(rf"\b{re.escape(w)}\b", low) for w in ensaio_triggers)
+    if is_ensaio_request:
         raw_photos = studio.get("photos") or "{}"
         photos_by_niche = {}
         try:
@@ -1096,9 +1136,10 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             photos_by_niche = ensure_demo_photos({})
 
         detected_niche = None
-        for n in ["gestante", "newborn", "família", "familia", "casal", "casamento"]:
-            if n in low:
-                detected_niche = n.replace("í", "i")
+        for n in ["casamento", "formatura", "gestante", "newborn", "família", "familia", "casal", "corporativo", "15anos", "15 anos", "debutante"]:
+            if re.search(rf"\b{re.escape(n)}\b", low):
+                clean_n = n.replace("í", "i").replace("15 anos", "15anos").replace("debutante", "15anos")
+                detected_niche = clean_n
                 break
 
         target_photos = []
@@ -1110,18 +1151,20 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             target_photos = photos_by_niche.get(first_niche_key) or []
 
         if target_photos:
-            nicho_label = niche_names_map.get(detected_niche, detected_niche.title()) if detected_niche else niches_formatted
+            nicho_label = niche_names_map.get(detected_niche, detected_niche.title() if detected_niche else niches_formatted)
             for idx, p_url in enumerate(target_photos[:3], 1):
                 send_whatsapp_message(studio, wa_id, f"Exemplo {idx}/{min(len(target_photos), 3)} - {nicho_label} • {studio_name}", image_url=p_url)
+            vocativo = f", {first_name}" if first_name else ""
             reply = (
                 f"Acabei de te mandar fotos de exemplo dos nossos trabalhos de {nicho_label} aqui no {studio_name} 📸 "
-                f"Nossos ensaios começam em R$ {price}. Tenho estes horários livres: {slots_text}. Qual deles fica melhor para você?"
+                f"Nossos pacotes começam a partir de R$ {price}. Tenho estes horários livres{vocativo}: {slots_text}. Qual deles fica melhor para você?"
             )
             return limit_to_one_emoji(reply), target_photos[0], False, slot_options
         else:
+            vocativo = f", {first_name}" if first_name else ""
             reply = (
                 f"Aqui no {studio_name} nós fazemos ensaios lindos de {niches_formatted}! ✨ "
-                f"Nossos pacotes começam a partir de R$ {price}. Tenho livres: {slots_text}. Gostaria de garantir um desses horários?"
+                f"Nossos pacotes começam a partir de R$ {price}. Tenho livres{vocativo}: {slots_text}. Gostaria de garantir um desses horários?"
             )
             return limit_to_one_emoji(reply), None, False, slot_options
 
@@ -1166,7 +1209,8 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
 
     # 4f. Se o usuário enviou o nome dele (resposta a 'Como posso te chamar?')
     words = user_text.strip().split()
-    if not is_known_name and len(words) <= 3 and not any(w in low for w in ["ensaio", "foto", "preço", "horário", "dia", "sim", "não"]):
+    niche_words = ["gestante", "newborn", "familia", "família", "casamento", "formatura", "casal", "corporativo", "15anos", "15 anos", "debutante"]
+    if not is_known_name and len(words) <= 3 and not any(re.search(rf"{re.escape(w)}", low) for w in ["ensaio", "ensaios", "foto", "fotos", "preço", "preco", "horário", "horario", "dia", "sim", "não", "nao"] + niche_words):
         clean_cand = " ".join([w.capitalize() for w in words if w.isalpha()])
         if clean_cand:
             try:
