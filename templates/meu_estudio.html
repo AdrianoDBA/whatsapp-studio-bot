@@ -177,41 +177,29 @@
         Sua secretária virtual {{ studio.secretary_name }} envia essas fotos automaticamente para os clientes quando eles perguntam sobre cada ensaio:
       </p>
 
-      <!-- Gestante -->
-      <div class="niche-section">
-        <strong style="color: #fff; font-size: 14.5px;">🤰 Ensaio Gestante</strong>
-        <div class="gallery-grid">
-          {% for img in photos_by_niche.get('gestante', [])[:3] %}
-            <div class="gallery-img-box"><img src="{{ img }}" alt="Foto Gestante" /></div>
-          {% else %}
-            <div class="empty-slot">Sem fotos cadastradas</div>
-          {% endfor %}
-        </div>
-      </div>
+      {% set all_meu_niches = [
+        ('gestante', '🤰 Ensaio Gestante'),
+        ('newborn', '👶 Ensaio Newborn'),
+        ('familia', '👨‍👩‍👧 Ensaio Família'),
+        ('casamento', '💍 Ensaio Casamento & Pré-Wedding'),
+        ('formatura', '🎓 Ensaio Formatura & Becas'),
+        ('casal', '❤️ Ensaio Casal & Namorados'),
+        ('corporativo', '💼 Retrato Corporativo'),
+        ('15anos', '👑 Ensaio 15 Anos & Debutante')
+      ] %}
 
-      <!-- Newborn -->
-      <div class="niche-section">
-        <strong style="color: #fff; font-size: 14.5px;">👶 Ensaio Newborn</strong>
-        <div class="gallery-grid">
-          {% for img in photos_by_niche.get('newborn', [])[:3] %}
-            <div class="gallery-img-box"><img src="{{ img }}" alt="Foto Newborn" /></div>
-          {% else %}
-            <div class="empty-slot">Sem fotos cadastradas</div>
-          {% endfor %}
+      {% for n_key, n_title in all_meu_niches %}
+        <div class="niche-section">
+          <strong style="color: #fff; font-size: 14.5px;">{{ n_title }}</strong>
+          <div class="gallery-grid">
+            {% for img in photos_by_niche.get(n_key, [])[:3] %}
+              <div class="gallery-img-box"><img src="{{ img }}" alt="{{ n_title }}" /></div>
+            {% else %}
+              <div class="empty-slot">Sem fotos cadastradas</div>
+            {% endfor %}
+          </div>
         </div>
-      </div>
-
-      <!-- Família -->
-      <div class="niche-section">
-        <strong style="color: #fff; font-size: 14.5px;">👨‍👩‍👧 Ensaio Família</strong>
-        <div class="gallery-grid">
-          {% for img in photos_by_niche.get('familia', [])[:3] %}
-            <div class="gallery-img-box"><img src="{{ img }}" alt="Foto Família" /></div>
-          {% else %}
-            <div class="empty-slot">Sem fotos cadastradas</div>
-          {% endfor %}
-        </div>
-      </div>
+      {% endfor %}
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">

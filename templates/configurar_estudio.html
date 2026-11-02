@@ -497,7 +497,8 @@
           btn.disabled = false;
         }
       } catch (err) {
-        alert('Erro de conexão ao salvar.');
+        console.error('Erro ao salvar configuração:', err);
+        alert('Erro ao salvar: ' + (err.message || 'Verifique sua conexão ou tente novamente.'));
         btn.textContent = 'SALVAR E REVISAR MEU ESTÚDIO →';
         btn.disabled = false;
       }
@@ -505,12 +506,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      renderSlots('gestante');
-      renderSlots('newborn');
-      renderSlots('familia');
-      alternarBlocoNicho('gestante');
-      alternarBlocoNicho('newborn');
-      alternarBlocoNicho('familia');
+      ALL_NICHES.forEach(n => {
+        renderSlots(n);
+        alternarBlocoNicho(n);
+      });
     });
   </script>
 </body>
