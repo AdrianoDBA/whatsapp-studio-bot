@@ -2191,4 +2191,6 @@ init_db()
 ensure_qr_comecar()
 
 if __name__ == "__main__":
+    PORT = int(os.getenv("PORT", 5005))
+    DB_PATH = os.getenv("DB_PATH", "/data/studio.db" if os.path.exists("/data") else "studio.db")
     app.run(host="0.0.0.0", port=PORT)

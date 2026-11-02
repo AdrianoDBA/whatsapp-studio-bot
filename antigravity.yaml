@@ -1,14 +1,13 @@
 name: whatsapp-studio-bot
-runtime: python
 port: 5005
 domain: whatsapp-studio-bot.antigravity.app
 healthcheck: /health
 env:
-  - GEMINI_API_KEY
-  - WHATSAPP_APP_ID
-  - WHATSAPP_APP_SECRET
-  - VERIFY_TOKEN
-  - ENCRYPTION_KEY
-volumes:
-  - name: studio-data
-    path: /data
+    - GEMINI_API_KEY
+    - WHATSAPP_APP_ID
+    - WHATSAPP_APP_SECRET
+    - VERIFY_TOKEN
+    - ENCRYPTION_KEY
+volume:
+  path: /data
+  name: studio-data
