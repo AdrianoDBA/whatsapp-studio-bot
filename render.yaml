@@ -2,7 +2,7 @@ services:
   - type: web
     name: whatsapp-studio-bot
     env: docker
-    plan: free
+    plan: starter
     autoDeploy: true
     healthCheckPath: /health
     disk:
