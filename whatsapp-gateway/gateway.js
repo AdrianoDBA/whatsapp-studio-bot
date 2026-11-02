@@ -18,7 +18,7 @@ app.use(express.json());
 const PORT = 5006;
 const FLASK_WEBHOOK_URL = 'http://127.0.0.1:5005/webhook';
 const APP_SECRET = process.env.APP_SECRET || 'studio_bot_app_secret_2026';
-const AUTH_DIR = path.join(__dirname, 'auth_session');
+const AUTH_DIR = process.env.AUTH_DIR || (fs.existsSync('/data') ? '/data/auth_session' : path.join(__dirname, 'auth_session'));
 
 let sock = null;
 let currentStatus = 'DISCONNECTED';
