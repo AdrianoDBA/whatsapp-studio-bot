@@ -122,12 +122,11 @@ limiter = Limiter(
 
 @app.after_request
 def apply_security_headers(response):
-    allowed_origin = PUBLIC_BASE_URL
     origin = request.headers.get("Origin", "")
-    if origin in (allowed_origin, "http://localhost:5005", "http://127.0.0.1:5005"):
+    if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
     else:
-        response.headers["Access-Control-Allow-Origin"] = allowed_origin
+        response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Hub-Signature-256"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, DELETE"
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -1827,7 +1826,12 @@ def api_ativar_estudio():
     atualiza status para 'active' e retorna redirect_url para /painel?token=...
     """
     data = request.get_json(silent=True) or request.form or {}
-    token = data.get("token") or request.args.get("token")
+    token = (
+        data.get("token")
+        or data.get("acesso")
+        or request.args.get("token")
+        or request.args.get("acesso")
+    )
     if not token:
         return jsonify({"ok": False, "error": "Token de autenticação obrigatório"}), 403
 
