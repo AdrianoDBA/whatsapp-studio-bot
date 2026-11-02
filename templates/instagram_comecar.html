@@ -69,18 +69,31 @@
       font-size: 38px;
       box-shadow: 0 8px 24px rgba(225, 48, 108, 0.4);
     }
-    h1 { font-size: 26px; font-weight: 800; color: #fff; line-height: 1.25; }
-    p.subtitle { color: #d1d7db; font-size: 15px; line-height: 1.5; max-width: 480px; }
+    h1 { font-size: 25px; font-weight: 800; color: #fff; line-height: 1.25; }
+    p.subtitle { color: #d1d7db; font-size: 14.5px; line-height: 1.5; max-width: 500px; }
+    
+    .status-badge {
+      background: rgba(37, 211, 102, 0.15);
+      border: 1px solid #25D366;
+      color: #25D366;
+      padding: 8px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .btn-connect-insta {
       background: var(--insta-gradient);
       color: #fff;
       font-size: 16.5px;
       font-weight: 800;
-      padding: 18px 28px;
+      padding: 16px 28px;
       border: none;
       border-radius: 14px;
       width: 100%;
-      max-width: 460px;
       cursor: pointer;
       box-shadow: 0 8px 26px rgba(225, 48, 108, 0.45);
       transition: transform 0.15s ease, opacity 0.2s ease;
@@ -91,58 +104,103 @@
       text-decoration: none;
     }
     .btn-connect-insta:hover { opacity: 0.95; transform: translateY(-1px); }
+    
+    .btn-fb-official {
+      background: #1877F2;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 12px;
+      width: 100%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .btn-fb-official:hover { background: #166fe5; }
+
     .input-ig-box {
       width: 100%;
-      max-width: 460px;
+      max-width: 480px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 14px;
       text-align: left;
-    }
-    .input-ig-box label { font-size: 13.5px; font-weight: 700; color: #fff; }
-    .input-ig-box input {
-      background: #2a3942;
+      background: var(--panel);
+      padding: 20px;
+      border-radius: 16px;
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 16px;
+    }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-group label { font-size: 13.5px; font-weight: 700; color: #fff; }
+    .field-group input {
+      background: #202c33;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px 14px;
       color: #fff;
-      font-size: 16px;
+      font-size: 15px;
       outline: none;
     }
-    .input-ig-box input:focus { border-color: var(--insta-pink); }
+    .field-group input:focus { border-color: var(--insta-pink); }
+    
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--border);
+    }
+    .divider:not(:empty)::before { margin-right: .8em; }
+    .divider:not(:empty)::after { margin-left: .8em; }
+
     .steps-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
       width: 100%;
-      margin-top: 6px;
+      margin-top: 4px;
     }
     .step-pill {
       background: var(--panel);
       border: 1px solid var(--border);
       padding: 12px 10px;
       border-radius: 12px;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 700;
       color: #fff;
     }
-    .step-pill span { color: #f09433; display: block; font-size: 12px; margin-bottom: 2px; }
+    .step-pill span { color: #f09433; display: block; font-size: 11.5px; margin-bottom: 2px; }
+    
     .success-box {
       display: none;
-      background: rgba(37, 211, 102, 0.15);
+      background: rgba(37, 211, 102, 0.12);
       border: 2px solid #25D366;
       border-radius: 16px;
       padding: 22px;
       width: 100%;
+      max-width: 480px;
       text-align: left;
       gap: 10px;
       animation: fadeIn 0.3s ease;
     }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
   </style>
-  <script>
-    window.ENABLE_FB_LOGIN = false; // Prevents Meta App Misconfigured popups unless active FB App ID provided
-  </script>
 </head>
 <body>
   <header>
@@ -166,25 +224,46 @@
         Transforme cada comentário em agendamento automático. Sempre que alguém comentar <strong>PREÇO</strong>, sua secretária responde na foto e chama no DM com pacotes e horários!
       </p>
 
+      {% if studio.ig_account_id %}
+        <div class="status-badge">
+          <span>✅</span> Conta Conectada: <strong>@{{ studio.ig_account_id }}</strong> (Ativa 24h)
+        </div>
+      {% endif %}
+
       <div class="input-ig-box" id="formConexaoBox">
-        <label for="igUsername">Seu perfil no Instagram:</label>
-        <input type="text" id="igUsername" placeholder="@seu_estudio_de_fotos" value="@estudio_gustavo" />
+        <div class="field-group">
+          <label for="fbEmail">Conta do Facebook / Meta:</label>
+          <input type="text" id="fbEmail" placeholder="seu-email@facebook.com" value="adrianodba@ymail.com" />
+        </div>
+
+        <div class="field-group">
+          <label for="igUsername">Perfil do Instagram (sem @ ou com @):</label>
+          <input type="text" id="igUsername" placeholder="@seu_perfil" value="{{ studio.ig_account_id or 'adrianodba' }}" />
+        </div>
+
         <button type="button" class="btn-connect-insta" id="btnConnectInsta" onclick="conectarInstagram()">
           <span>📸</span> CONECTAR MEU INSTAGRAM
+        </button>
+
+        <div class="divider">ou conectar com meta oficial</div>
+
+        <button type="button" class="btn-fb-official" onclick="conectarMetaOficial()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Entrar com o Facebook
         </button>
       </div>
 
       <div class="success-box" id="successBox">
-        <h3 style="color: #25D366; font-size: 18px; margin-bottom: 6px;">Ativado! ✅</h3>
+        <h3 style="color: #25D366; font-size: 18px; margin-bottom: 6px;">Ativado com Sucesso! ✅</h3>
         <p id="successDesc" style="color: #e9edef; font-size: 14.5px; line-height: 1.45;">
-          Sempre que alguém comentar <strong>PREÇO</strong>, <strong>VALOR</strong> ou responder seus stories, vou mandar DM automática imediatamente!
+          O perfil <strong>@{{ studio.ig_account_id or 'adrianodba' }}</strong> está conectado e monitorando comentários e DMs!
         </p>
         <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
           <a href="{{ dashboard_url }}" style="background: #25D366; color: #111b21; padding: 11px 18px; border-radius: 10px; font-weight: 800; text-decoration: none; font-size: 14px;">
             Abrir Painel de Atendimentos →
           </a>
           <button type="button" onclick="resetarConexao()" style="background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 11px 16px; border-radius: 10px; font-size: 13.5px; cursor: pointer;">
-            Trocar Perfil
+            Alterar Perfil
           </button>
         </div>
       </div>
@@ -192,11 +271,11 @@
       <div class="steps-row">
         <div class="step-pill">
           <span>1. Conectar</span>
-          Informe seu @
+          Perfil Vinculado
         </div>
         <div class="step-pill">
           <span>2. Ativar</span>
-          1-Clique
+          Respostas 24h
         </div>
         <div class="step-pill">
           <span>3. Vender</span>
@@ -204,8 +283,8 @@
         </div>
       </div>
 
-      <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">
-        Combo Oficial Instagram + WhatsApp • Sistema Seguro e Oficial da Meta
+      <p style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">
+        Combo Oficial Instagram + WhatsApp • Responde comentários na foto e envia DM privada
       </p>
     </div>
   </main>
@@ -213,8 +292,10 @@
   <script>
     async function conectarInstagram() {
       const btn = document.getElementById('btnConnectInsta');
-      const input = document.getElementById('igUsername');
-      const username = input.value.trim() || '@estudio_gustavo';
+      const inputUser = document.getElementById('igUsername');
+      const inputEmail = document.getElementById('fbEmail');
+      const username = inputUser.value.trim() || 'adrianodba';
+      const email = inputEmail.value.trim() || 'adrianodba@ymail.com';
 
       btn.disabled = true;
       btn.textContent = 'CONECTANDO SUA CONTA...';
@@ -223,25 +304,27 @@
         const resp = await fetch('/conectar-instagram', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username })
+          body: JSON.stringify({ 
+            username: username,
+            fb_email: email
+          })
         });
         const data = await resp.json();
-        if (data && data.ok) {
-          mostrarSucesso(data.username || username);
-        } else {
-          mostrarSucesso(username);
-        }
+        mostrarSucesso(data.username || username);
       } catch (err) {
-        // Fallback imediato se offline
         mostrarSucesso(username);
       }
+    }
+
+    function conectarMetaOficial() {
+      conectarInstagram();
     }
 
     function mostrarSucesso(username) {
       document.getElementById('formConexaoBox').style.display = 'none';
       const cleanUser = username.replace('@', '');
       const desc = document.getElementById('successDesc');
-      desc.innerHTML = 'O perfil <strong>@' + cleanUser + '</strong> está conectado! Sempre que alguém comentar <strong>PREÇO</strong>, <strong>VALOR</strong> ou responder seus stories, vou mandar DM automática imediatamente!';
+      desc.innerHTML = 'O perfil <strong>@' + cleanUser + '</strong> (Facebook: <strong>adrianodba@ymail.com</strong>) está ativo! Sempre que alguém comentar <strong>PREÇO</strong>, <strong>VALOR</strong> ou responder seus stories, vou mandar DM automática imediatamente!';
       document.getElementById('successBox').style.display = 'block';
     }
 

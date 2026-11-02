@@ -277,7 +277,7 @@ def receive_instagram_webhook():
 
     # 1. Estrutura Oficial Graph API entry -> changes / messaging
     entries = data.get("entry", [])
-    if not entries and ("type" in data or "comment_id" in data or "message" in data):
+    if not entries and ("type" in data or "comment_id" in data or "message" in data or "text" in data or "ig_id" in data):
         entries = [{"standalone": data}]
 
     for entry in entries:
