@@ -16,7 +16,8 @@ const app = express();
 app.use(express.json());
 
 const PORT = 5006;
-const FLASK_WEBHOOK_URL = 'http://127.0.0.1:5005/webhook';
+const FLASK_PORT = process.env.PORT || '5005';
+const FLASK_WEBHOOK_URL = process.env.FLASK_WEBHOOK_URL || `http://127.0.0.1:${FLASK_PORT}/webhook`;
 const APP_SECRET = process.env.APP_SECRET || 'studio_bot_app_secret_2026';
 const AUTH_DIR = process.env.AUTH_DIR || (fs.existsSync('/data') ? '/data/auth_session' : path.join(__dirname, 'auth_session'));
 
