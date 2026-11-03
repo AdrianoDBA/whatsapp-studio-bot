@@ -1191,9 +1191,9 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         )
         return limit_to_one_emoji(reply), None, False, slot_options
 
-    # 4d. Se o cliente perguntou sobre horários / datas / disponibilidade
-    if any(w in low for w in ["horário", "horario", "datas", "quando tem", "agenda", "disponibilidade"]):
-        reply = f"Tenho estas 3 opções mais próximas no momento: {slots_text}. Qual delas fica melhor para você?"
+    # 4d. Se o cliente perguntou sobre horários / datas / disponibilidade ou clicou em 'Ver Outros Dias'
+    if any(w in low for w in ["horário", "horario", "datas", "quando tem", "agenda", "disponibilidade", "ver outros dias", "outros dias", "outras datas", "outros horários", "outros horarios"]):
+        reply = f"Tenho estas opções livres na nossa agenda agora: {slots_text}. Qual delas fica melhor para você?"
         return limit_to_one_emoji(reply), None, False, slot_options
 
     # 4e. Saudação Contextual Espelhada e Humanizada (sem jargão nem vocativo 'Cliente')
@@ -1225,7 +1225,8 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
     # 4f. Se o usuário enviou o nome dele (resposta a 'Como posso te chamar?')
     words = user_text.strip().split()
     niche_words = ["gestante", "newborn", "familia", "família", "casamento", "formatura", "casal", "corporativo", "15anos", "15 anos", "debutante"]
-    if not is_known_name and len(words) <= 3 and not any(re.search(rf"{re.escape(w)}", low) for w in ["ensaio", "ensaios", "foto", "fotos", "preço", "preco", "horário", "horario", "dia", "sim", "não", "nao"] + niche_words):
+    action_words = ["ver", "olhar", "tirar", "dúvida", "duvida", "falar", "ajuda", "agendar", "marcar", "reservar", "outro", "outros", "outras"]
+    if not is_known_name and len(words) <= 3 and not any(re.search(rf"{re.escape(w)}", low) for w in ["ensaio", "ensaios", "foto", "fotos", "preço", "preco", "horário", "horario", "dia", "dias", "sim", "não", "nao"] + niche_words + action_words):
         clean_cand = " ".join([w.capitalize() for w in words if w.isalpha()])
         if clean_cand:
             try:
@@ -2049,7 +2050,7 @@ def page_dashboard():
         f["start_at"] = format_slot_human(f["start_at"])
 
     c.execute(
-        "SELECT * FROM messages WHERE studio_id = ? ORDER BY id DESC LIMIT 25",
+        "SELECT * FROM messages WHERE studio_id = ? ORDER BY id ASC LIMIT 50",
         (studio_id,),
     )
     conversations = [dict(r) for r in c.fetchall()]
