@@ -91,12 +91,19 @@ async function startSock() {
     }
 
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+      const isLoggedOut = (lastDisconnect?.error)?.output?.statusCode === DisconnectReason.loggedOut;
+      const shouldReconnect = !isLoggedOut;
       console.log('[WHATSAPP GATEWAY] Conexão fechada. Reconectar:', shouldReconnect);
       currentStatus = 'DISCONNECTED';
       currentQR = null;
       connectedNumber = null;
-      if (shouldReconnect) {
+      if (isLoggedOut) {
+        console.log('[WHATSAPP GATEWAY] Sessão expirada/desconectada. Limpando credenciais antigas para novo QR Code...');
+        try {
+          fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        } catch (e) {}
+        setTimeout(startSock, 2000);
+      } else if (shouldReconnect) {
         setTimeout(startSock, 3000);
       }
     } else if (connection === 'open') {
