@@ -9,3 +9,6 @@ whatsapp-gateway/auth_info_baileys/
 frontend/node_modules/
 frontend/dist/
 whatsapp-gateway/auth_session/
+
+static/comprovantes/*.png
+uploads/*
