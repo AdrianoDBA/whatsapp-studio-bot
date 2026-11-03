@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: whatsapp-studio-bot-coromandel
+    name: whatsapp-studio-bot
     env: docker
     plan: starter
     autoDeploy: true

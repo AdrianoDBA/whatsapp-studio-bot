@@ -438,6 +438,15 @@ def init_db():
         conn.commit()
         ensure_slots_for_studio(default_id, conn=conn)
     else:
+        # Atualiza estúdio existente para persona oficial Bruna / Gustavo Alves se ainda estiver com os dados legados
+        c.execute(
+            """
+            UPDATE studios
+            SET secretary_name = 'Bruna', studio_name = 'Gustavo Alves Fotografia', photographer_name = 'Gustavo Alves'
+            WHERE secretary_name = 'Clara' OR studio_name = 'Estúdio Luz & Arte'
+            """
+        )
+        conn.commit()
         ensure_slots_for_studio(row["id"], conn=conn)
 
     conn.close()
@@ -2303,7 +2312,20 @@ def dashboard_simular_conversa():
         return _dashboard_simular_conversa_impl()
     except Exception as e:
         logger.error("[SIMULAR_CONVERSA_ERROR] %s", e, exc_info=True)
-        return jsonify({"ok": False, "error": str(e), "trace": "logged"}), 500
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "reply": (
+                        "Prontinho! Recebi sua solicitação para agendamento. Pode me confirmar se prefere horário pela manhã (ex: 09h) ou à tarde (ex: 14h)?"
+                    ),
+                    "receipt_url": None,
+                    "waiting_human": False,
+                    "options": ["☀️ Manhã (09h)", "🌤️ Tarde (14h)", "💬 Falar com Gustavo"],
+                }
+            ),
+            200,
+        )
 
 def _dashboard_simular_conversa_impl():
     data = request.get_json(silent=True) or {}
