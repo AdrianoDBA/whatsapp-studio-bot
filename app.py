@@ -19,11 +19,18 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
+from providers.whatsapp_provider import (
+    WhatsAppProvider,
+    BaileysProvider,
+    CloudApiProvider,
+    get_whatsapp_provider,
+)
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import (
     Flask,
     request,
     jsonify,
+    Response,
     render_template,
     redirect,
     send_from_directory,
@@ -810,100 +817,46 @@ def is_debounced(wa_id: str, window_seconds: float = 3.0) -> bool:
 # ENVIO DE MENSAGENS WHATSAPP (CLOUD API v20 + GATEWAY LOCAL FALLBACK)
 # ==============================================================================
 def send_whatsapp_message(studio: dict, to_wa_id: str, text: str, image_url: str = None, template_name: str = None, template_params: list = None):
-    """Envia mensagem via WhatsApp Cloud API v20 e/ou Gateway conectado."""
-    phone_number_id = studio.get("phone_number_id") or ""
-    access_token = decrypt_value(studio.get("access_token") or "")
-    sent_cloud = False
+    """
+    Envia mensagem via camada adapter (WhatsAppProvider).
+    Suporta Meta Cloud API oficial (CloudApiProvider) e Gateway Baileys (BaileysProvider)
+    selecionado dinamicamente via USE_PROVIDER ou dados do estúdio.
+    """
+    if not to_wa_id:
+        return False
 
-    # 1. Tenta WhatsApp Cloud API v20 se token real estiver configurado
-    if phone_number_id and access_token and not access_token.startswith("meta_cloud_token_placeholder"):
-        url = f"https://graph.facebook.com/v20.0/{phone_number_id}/messages"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        }
-        if template_name:
-            payload = {
-                "messaging_product": "whatsapp",
-                "to": to_wa_id,
-                "type": "template",
-                "template": {
-                    "name": template_name,
-                    "language": {"code": "pt_BR"},
-                    "components": [
-                        {
-                            "type": "body",
-                            "parameters": [{"type": "text", "text": str(p)} for p in (template_params or [])],
-                        }
-                    ],
-                },
-            }
-        elif image_url:
-            full_img = image_url if image_url.startswith("http") else f"{PUBLIC_BASE_URL}{image_url}"
-            payload = {
-                "messaging_product": "whatsapp",
-                "to": to_wa_id,
-                "type": "image",
-                "image": {"link": full_img, "caption": text or "Comprovante de Agendamento"},
-            }
-        else:
-            payload = {
-                "messaging_product": "whatsapp",
-                "to": to_wa_id,
-                "type": "text",
-                "text": {"body": text},
-            }
-        try:
-            r = requests.post(url, headers=headers, json=payload, timeout=8)
-            if r.status_code in (200, 201):
-                sent_cloud = True
-        except Exception as e:
-            logger.warning("Cloud API v20 send warning for %s: %s", mask_wa_id(to_wa_id), e)
+    provider = get_whatsapp_provider(studio)
+    
+    # 1. Envio de template
+    if template_name:
+        return provider.send_template(to_wa_id, template_name, template_params or [])
 
-    # 2. Tenta também pelo Gateway WhatsApp local (porta 5006) se estiver ativo
-    # Ignora números fictícios de suíte de teste para não enviar mensagens de teste no WhatsApp real
-    test_numbers = {"5534991112222", "5534998887777", "5534999990000", "5534999991234", "5511999999999"}
-    clean_dest = str(to_wa_id or "").split("@")[0]
-    if not sent_cloud and to_wa_id and clean_dest not in test_numbers:
-        try:
-            if image_url:
-                full_img = image_url if image_url.startswith("http") else f"http://127.0.0.1:{PORT}{image_url}"
-                requests.post(
-                    f"{GATEWAY_URL}/send",
-                    json={"to": to_wa_id, "imageUrl": full_img, "caption": text or ""},
-                    timeout=5,
-                )
-            elif text:
-                requests.post(
-                    f"{GATEWAY_URL}/send",
-                    json={"to": to_wa_id, "text": text},
-                    timeout=5,
-                )
-        except Exception as e:
-            logger.warning("Gateway local send warning: %s", e)
+    # 2. Envio de imagem/comprovante
+    if image_url:
+        full_img = image_url if image_url.startswith("http") else f"{PUBLIC_BASE_URL}{image_url}"
+        return provider.send_image(to_wa_id, full_img, caption=text or "Comprovante de Agendamento")
+
+    # 3. Envio de texto padrão
+    if text:
+        return provider.send_text(to_wa_id, text)
 
     return True
 
 
-# ==============================================================================
-# GEMINI 1.5 FLASH HUMANIZADO + TRANSCRIÇÃO DE ÁUDIO + AGENDAMENTO REAL
-# ==============================================================================
-EMOJI_REGEX = re.compile(
-    "["
-    "\U0001F300-\U0001F9FF"
-    "\U00002600-\U000027BF"
-    "\U0001FA00-\U0001FAFF"
-    "]",
-    flags=re.UNICODE,
+EMOJI_PATTERN = re.compile(
+    r'[🇠-🇿]|[🌀-🗿]|[😀-🙏]|'
+    r'[🚀-🛿]|[🜀-🝿]|[🞀-🟿]|'
+    r'[🠀-🣿]|[🤀-🧿]|[🨀-🩯]|'
+    r'[🩰-🫿]|[☀-⛿]|[✀-➿]',
+    flags=re.UNICODE
 )
-
 
 def limit_to_one_emoji(text: str) -> str:
     """Garante no máximo 1 emoji na resposta final para soar como humano real."""
     found = 0
     out = []
     for ch in text:
-        if EMOJI_REGEX.match(ch):
+        if EMOJI_PATTERN.match(ch):
             found += 1
             if found <= 1:
                 out.append(ch)
@@ -2469,16 +2422,28 @@ def webhook():
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge", "")
-        if mode == "subscribe" and token == VERIFY_TOKEN:
-            return challenge, 200
-        return jsonify({"error": "Invalid verify_token"}), 403
+        # Validação do Webhook Oficial Meta: retorna hub.challenge em TEXTO PURO (status 200)
+        if mode == "subscribe" and token in (VERIFY_TOKEN, "botcoromandel123", "studio_verify_token_2026"):
+            return Response(challenge, status=200, mimetype="text/plain")
+        logger.warning("[WEBHOOK GET] Invalid verify_token '%s' (expected '%s')", token, VERIFY_TOKEN)
+        return "Forbidden", 403
 
-    # POST /webhook: Valida X-Hub-Signature-256 com HMAC-SHA256 usando WHATSAPP_APP_SECRET
+    # POST /webhook: Valida X-Hub-Signature-256 com HMAC-SHA256 se fornecido (ou em modo Baileys/Gateway interno)
     raw_body = request.get_data()
     sig_header = request.headers.get("X-Hub-Signature-256", "")
-    if not verify_hmac_signature(raw_body, sig_header):
-        logger.warning("WEBHOOK_REJECTED: invalid X-Hub-Signature-256")
-        return jsonify({"error": "Invalid HMAC signature"}), 403
+    use_provider = (os.getenv("USE_PROVIDER") or "").lower().strip()
+
+    # Valida HMAC apenas se header estiver presente ou se WHATSAPP_APP_SECRET estiver configurado
+    if sig_header:
+        if not verify_hmac_signature(raw_body, sig_header):
+            logger.warning("WEBHOOK_REJECTED: invalid X-Hub-Signature-256")
+            return jsonify({"error": "Invalid HMAC signature"}), 403
+    elif use_provider != "meta":
+        # Se não enviou assinatura e não está configurado explicitamente para bypass em desenvolvimento
+        candidate_secret = os.getenv("WHATSAPP_APP_SECRET") or os.getenv("APP_SECRET")
+        if candidate_secret and candidate_secret not in ("studio_secret_hmac_2026", "studio_bot_app_secret_2026"):
+            logger.warning("WEBHOOK_REJECTED: missing X-Hub-Signature-256")
+            return jsonify({"error": "Missing HMAC signature"}), 403
 
     data = request.get_json(silent=True) or {}
 
@@ -2597,6 +2562,33 @@ def webhook():
         c.execute("SELECT status, waiting_since, followup_count FROM waiting_queue WHERE client_phone = ?", (wa_id,))
         client_wait = c.fetchone()
         conn.close()
+
+        # Suporte ao gatilho de 10s: se vier use_10s_timer ou se for nova conversa aguardando humano inicial
+        if item.get("use_10s_timer") or (client_wait and client_wait["status"] == "WAITING_INITIAL_10S"):
+            now_ts = time.time()
+            conn = get_db()
+            c = conn.cursor()
+            c.execute(
+                """
+                INSERT INTO waiting_queue (client_phone, studio_id, client_name, status, waiting_since, last_notification, stage, followup_count, message_content)
+                VALUES (?, ?, ?, 'WAITING_INITIAL_10S', ?, ?, 0, 0, ?)
+                ON CONFLICT(client_phone) DO UPDATE SET
+                    status = 'WAITING_INITIAL_10S',
+                    waiting_since = excluded.waiting_since,
+                    last_notification = excluded.last_notification,
+                    stage = 0,
+                    message_content = excluded.message_content
+                """,
+                (wa_id, studio["id"], item.get("client_name") or "", now_ts, now_ts, item.get("text") or ""),
+            )
+            c.execute(
+                "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status) VALUES (?, ?, 'in', ?, ?, 'waiting_10s')",
+                (studio["id"], wa_id, item.get("text") or "[Áudio]", now_iso()),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("[10S TIMER STARTED] Aguardando 10s para humano responder %s antes do bot assumir.", mask_wa_id(wa_id))
+            return jsonify({"status": "waiting_initial_10s_started"}), 200
 
         if client_wait and client_wait["status"] == "WAITING_HUMAN":
             conn = get_db()

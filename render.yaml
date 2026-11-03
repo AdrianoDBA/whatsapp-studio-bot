@@ -19,16 +19,20 @@ services:
       - key: AUTH_DIR
         value: /data/auth_session
       - key: VERIFY_TOKEN
-        value: studio_verify_token_2026
+        value: botcoromandel123
+      - key: USE_PROVIDER
+        value: meta
       - key: APP_SECRET
         value: studio_bot_app_secret_2026
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: PHONE_NUMBER_ID
+        sync: false
       - key: WHATSAPP_APP_ID
         sync: false
       - key: WHATSAPP_APP_SECRET
         sync: false
       - key: WABA_ID
-        sync: false
-      - key: PHONE_NUMBER_ID
         sync: false
       - key: GEMINI_API_KEY
         sync: false

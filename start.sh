@@ -16,10 +16,19 @@ if [ -d "/app/whatsapp-gateway/auth_session" ] && [ ! -f "/data/auth_session/cre
     cp -r /app/whatsapp-gateway/auth_session/* /data/auth_session/ 2>/dev/null || true
 fi
 
-echo "[STARTUP] Iniciando WhatsApp Baileys Gateway na porta 5006..."
-cd /app/whatsapp-gateway
-node gateway.js &
+# Provedor padrão: meta (Cloud API Oficial) ou baileys (QR Code local)
+PROVIDER="${USE_PROVIDER:-meta}"
+echo "[STARTUP] Modo de Provedor WhatsApp configurado: $PROVIDER"
 
-echo "[STARTUP] Iniciando Gunicorn na porta ${PORT:-5005}..."
+if [ "$PROVIDER" = "baileys" ]; then
+    echo "[STARTUP] USE_PROVIDER=baileys: Iniciando WhatsApp Baileys Gateway na porta 5006..."
+    cd /app/whatsapp-gateway
+    node gateway.js &
+    cd /app
+else
+    echo "[STARTUP] USE_PROVIDER=meta: Usando WhatsApp Cloud API oficial. Gateway Baileys mantido em repouso (sem geração de QR Code)."
+fi
+
+echo "[STARTUP] Iniciando Gunicorn na porta ${PORT:-10000}..."
 cd /app
-exec gunicorn --bind 0.0.0.0:${PORT:-5005} --workers 1 --threads 4 --timeout 120 app:app
+exec gunicorn --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120 app:app
