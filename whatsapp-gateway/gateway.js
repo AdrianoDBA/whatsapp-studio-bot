@@ -124,10 +124,10 @@ async function startSock() {
       const msgId = msg.key.id;
       if (!msgId || processedMsgIds.has(msgId) || botSentMsgIds.has(msgId)) continue;
 
-      // Ignore historical messages when type === 'append'
+      // Ignore historical messages when older than 300 seconds (5 min) to prevent clock skew drops
       const rawTs = Number(msg.messageTimestamp?.low || msg.messageTimestamp || 0);
       const nowSec = Math.floor(Date.now() / 1000);
-      if (rawTs > 0 && (nowSec - rawTs) > 45) {
+      if (rawTs > 0 && (nowSec - rawTs) > 300) {
         continue;
       }
 
@@ -211,7 +211,9 @@ async function startSock() {
           type: isAudio ? 'audio' : 'text',
           text: { body: text },
           id: msgId,
-          source: 'baileys_gateway'
+          source: 'baileys_gateway',
+          is_self_chat: isSelfChat,
+          phone_number_id: connectedNumber || ''
         });
         const sig = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(bodyStr).digest('hex');
         await fetch(FLASK_WEBHOOK_URL, {

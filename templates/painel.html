@@ -870,6 +870,58 @@
         if (btn) btn.classList.toggle('active-tab', a === aba);
         if (pane) pane.classList.toggle('active-pane', a === aba);
       });
+      if (aba === 'agendamentos') {
+        carregarAgendamentosDinamico();
+      }
+    }
+
+    async function carregarAgendamentosDinamico() {
+      try {
+        const resp = await fetch(`/api/agendamentos?acesso=${encodeURIComponent(DASHBOARD_CHAVE)}`);
+        const data = await resp.json();
+        if (data && data.ok && Array.isArray(data.agendamentos)) {
+          const grid = document.getElementById('agendamentosGrid');
+          if (!grid) return;
+          if (data.agendamentos.length === 0) {
+            grid.innerHTML = `
+              <div style="grid-column: 1 / -1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 40px 20px; text-align: center;">
+                <p style="color: var(--muted); font-size: 15px;">
+                  Nenhum agendamento ativo no momento. Quando um cliente reservar pelo WhatsApp ou Chat de Testes, o card aparecerá aqui automaticamente com o comprovante!
+                </p>
+              </div>
+            `;
+            return;
+          }
+          grid.innerHTML = data.agendamentos.map(slot => `
+            <div class="appointment-card booked" id="card-slot-${slot.id}" data-date-iso="${slot.raw_start_at}">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <span class="appointment-time">📅 ${slot.start_at}</span>
+                <span class="badge-status badge-active" style="font-size: 11px; padding: 2px 7px;">CONFIRMADO</span>
+              </div>
+              <div class="appointment-client">
+                👤 <strong>${slot.client_name}</strong>
+              </div>
+              <div style="font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px;">
+                <span>📸 ${slot.niche}</span>
+                <span>•</span>
+                <span>📱 ${slot.client_wa_id}</span>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                ${slot.receipt_path ? `
+                  <a href="${slot.receipt_path}" target="_blank" class="btn btn-outline" style="flex: 1; text-align: center; font-size: 12px; padding: 7px 10px; border-color: var(--green); color: var(--green); text-decoration: none;">
+                    📄 Ver Comprovante
+                  </a>
+                ` : ''}
+                <button type="button" class="btn btn-outline" style="border-color: #ea4335; color: #ea4335; font-size: 12px; padding: 7px 12px;" onclick="abrirModalCancelar(${slot.id}, '${slot.client_name}', '${slot.start_at}')">
+                  Desmarcar
+                </button>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        console.error('Erro ao atualizar agendamentos dinâmicos:', e);
+      }
     }
 
     async function alternarStatusSecretaria(novoStatus) {
@@ -985,7 +1037,7 @@
     }
 
     // Chat de Testes em Tempo Real com Botões Interativos
-    function renderMensagemChat(autor, texto, options) {
+    function renderMensagemChat(autor, texto, options, receiptUrl) {
       const container = document.getElementById('chatMessagesContainer');
       const empty = document.getElementById('emptyChatNotice');
       if (empty) empty.remove();
@@ -1000,6 +1052,20 @@
           '</div>';
       }
 
+      let receiptHtml = '';
+      if (receiptUrl) {
+        receiptHtml = `
+          <div style="margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--green);">
+            <img src="${receiptUrl}" alt="Comprovante de Agendamento" style="width: 100%; max-width: 280px; display: block; margin: 0 auto; border-radius: 8px;">
+            <div style="text-align: center; margin-top: 6px;">
+              <a href="${receiptUrl}" target="_blank" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; border-color: var(--green); color: var(--green); text-decoration: none;">
+                📄 Abrir Comprovante em Alta Resolução
+              </a>
+            </div>
+          </div>
+        `;
+      }
+
       const item = document.createElement('div');
       item.className = 'item-box';
       item.style.borderLeft = isBot ? '3px solid #25D366' : '3px solid #53bdeb';
@@ -1009,6 +1075,7 @@
           <span>${timeStr}</span>
         </div>
         <div style="font-size: 14px; color: #fff; line-height: 1.4;">${texto}</div>
+        ${receiptHtml}
         ${pillsHtml}
       `;
       container.appendChild(item);
@@ -1041,7 +1108,10 @@
         });
         const data = await resp.json();
         if (data && data.ok) {
-          renderMensagemChat('bot', data.reply, data.options || []);
+          renderMensagemChat('bot', data.reply, data.options || [], data.receipt_url || null);
+          if (data.receipt_url) {
+            carregarAgendamentosDinamico();
+          }
         }
       } catch (e) {
         renderMensagemChat('bot', 'Ops, tive uma falha de conexão rápida. Pode tentar novamente?', []);

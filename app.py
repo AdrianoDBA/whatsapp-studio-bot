@@ -911,12 +911,17 @@ def build_system_prompt(studio: dict, free_slots: list) -> str:
     slots_str = ", ".join([s["human"] for s in free_slots]) if free_slots else "Terça às 15h, Quarta às 10h, Sábado às 16h"
 
     return (
-        f"Você é {secretary_name}, secretária do {studio_name} do fotógrafo {photographer_name}. "
-        f"Fale como pessoa real do WhatsApp: frases curtas, calorosa, máximo 1 emoji, nunca diga que é IA ou assistente virtual. "
-        f"Se perguntarem se é robô diga 'Sou a {secretary_name}, trabalho aqui no estúdio'. "
-        f"Sempre ofereça 3 horários livres reais ({slots_str}) e pergunte qual prefere. "
-        f"Trabalhamos com: {niches}. Pacotes a partir de R$ {price}. "
-        f"Se pedir humano ou desconto fora da tabela, diga 'Claro! Já chamei o {photographer_name} aqui, ele já vem falar com você' e ative WAITING_HUMAN."
+        f"Você é {secretary_name}, a secretária atenciosa do {studio_name} do fotógrafo {photographer_name}.\n"
+        f"Suas diretrizes fundamentais de atendimento:\n"
+        f"1. Fale como uma pessoa real no WhatsApp: frases naturais, ágeis, calorosas e no máximo 1 emoji por mensagem.\n"
+        f"2. NUNCA diga que é robô, inteligência artificial ou bot. Se perguntarem, diga que é a {secretary_name} e trabalha no estúdio.\n"
+        f"3. NUNCA chame a pessoa pelo vocativo genérico 'Cliente'. Se ainda não souber o nome dela, pergunte com carinho como pode chamá-la.\n"
+        f"4. Siga este fluxo guiado e determinístico:\n"
+        f"   - Passo 1: Saudação espelhada (Bom dia / Boa tarde / Boa noite) + perguntar o nome da pessoa.\n"
+        f"   - Passo 2: Descobrir o estilo do ensaio desejado entre os nichos ativos do estúdio ({niches}), informando que o investimento começa a partir de R$ {price}.\n"
+        f"   - Passo 3: Apresentar EXATAMENTE 3 opções reais de horários livres da nossa agenda: {slots_str}.\n"
+        f"   - Passo 4: Assim que a pessoa confirmar a opção de dia e horário, confirme a reserva com alegria, informando que o comprovante oficial foi gerado e que o {photographer_name} já foi notificado.\n"
+        f"5. Se a pessoa pedir expressamente para falar com o fotógrafo ou pedir desconto fora da tabela, responda acolhedoramente: 'Com certeza! Já avisei o {photographer_name} aqui, só 1 minutinho que ele já vem falar com você' e transfira."
     )
 
 
@@ -967,10 +972,18 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
     c = conn.cursor()
     comprovante_id = uuid.uuid4().hex[:8]
 
-    # Passo 1: trava com status='locked' (prevenindo concorrência de 5min)
+    # Nome amigável formatado caso seja do Chat de Testes ou sem nome informado
+    final_client_name = client_name
+    if not final_client_name or final_client_name.strip().lower() in ["cliente", "cliente teste", ""]:
+        if "teste" in client_wa_id or client_wa_id == "5534999990000":
+            final_client_name = "Cliente do Chat de Testes"
+        else:
+            final_client_name = f"Cliente ({mask_wa_id(client_wa_id)})"
+
+    # Passo 1: trava com status='locked' (prevenindo concorrência)
     c.execute(
-        "UPDATE slots SET status = 'locked', client_wa_id = ?, client_name = ? WHERE id = ? AND status = 'free'",
-        (client_wa_id, client_name, slot["id"]),
+        "UPDATE slots SET status = 'locked', client_wa_id = ?, client_name = ? WHERE id = ? AND status IN ('free', 'locked')",
+        (client_wa_id, final_client_name, slot["id"]),
     )
     conn.commit()
 
@@ -979,14 +992,14 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
     png_url = generate_comprovante_png(
         studio_name=studio.get("studio_name") or "Estúdio",
         photographer_name=studio.get("photographer_name") or "Gustavo",
-        client_name=client_name if (client_name and client_name.strip() and client_name.strip().lower() != "cliente") else "Ensaio Agendado",
+        client_name=final_client_name,
         slot_human=slot["human"],
         comprovante_id=comprovante_id,
         niche=niche_label
     )
     c.execute(
-        "UPDATE slots SET status = 'booked', comprovante_id = ?, receipt_path = ? WHERE id = ?",
-        (comprovante_id, png_url, slot["id"]),
+        "UPDATE slots SET status = 'booked', client_wa_id = ?, client_name = ?, niche = ?, comprovante_id = ?, receipt_path = ? WHERE id = ?",
+        (client_wa_id, final_client_name, niche_label, comprovante_id, png_url, slot["id"]),
     )
     conn.commit()
     conn.close()
@@ -1238,7 +1251,7 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             conn = get_db()
             c = conn.cursor()
             c.execute(
-                "SELECT direction, content FROM messages WHERE studio_id = ? AND wa_id = ? ORDER BY id DESC LIMIT 6",
+                "SELECT direction, content FROM messages WHERE studio_id = ? AND wa_id = ? ORDER BY id DESC LIMIT 15",
                 (studio["id"], wa_id),
             )
             history_rows = list(reversed(c.fetchall()))
@@ -1249,7 +1262,7 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             ]
             full_prompt = (
                 f"{system_prompt}\n\n"
-                f"Histórico recente:\n" + "\n".join(hist_lines) + "\n\n"
+                f"Histórico recente ordenado da conversa:\n" + "\n".join(hist_lines) + "\n\n"
                 f"Pessoa ({first_name or 'Nome ainda não informado'}): {user_text}\n"
                 f"Responda como {secretary_name} (curta, calorosa, máx 1 emoji, NUNCA chame de 'Cliente', se não souber o nome pergunte gentilmente como pode chamar, oferecendo opções: {niches_formatted} ou horários: {slots_text}):"
             )
@@ -2179,6 +2192,58 @@ def api_cancelar_agendamento(slot_id: int):
     return jsonify({"ok": True, "slot_id": slot_id, "status": "free", "notified": bool(client_wa_id)})
 
 
+@app.route("/api/agendamentos", methods=["GET"])
+def api_listar_agendamentos():
+    """
+    Retorna lista completa e atualizada de todos os slots 'booked' para a aba Agendamentos.
+    Suporta autenticação por ?token= ou ?acesso=.
+    """
+    token = request.args.get("acesso") or request.args.get("token")
+    studio = None
+    if token:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            studio = dict(row)
+    if not studio:
+        studio = get_active_studio()
+
+    if not studio:
+        return jsonify({"ok": False, "error": "Studio não encontrado"}), 404
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, studio_id, start_at, end_at, status, client_wa_id, client_name, comprovante_id, niche, receipt_path FROM slots WHERE studio_id = ? AND status = 'booked' ORDER BY start_at ASC LIMIT 50",
+        (studio["id"],),
+    )
+    booked_slots = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    formatted = []
+    for b in booked_slots:
+        raw_start = b.get("start_at") or ""
+        human_start = format_slot_human(raw_start)
+        comprovante = b.get("comprovante_id") or ""
+        receipt = b.get("receipt_path") or (f"/static/comprovantes/{comprovante}.png" if comprovante else "")
+        formatted.append({
+            "id": b["id"],
+            "raw_start_at": raw_start,
+            "start_at": human_start,
+            "client_name": b.get("client_name") or "Cliente Agendado",
+            "client_wa_id": b.get("client_wa_id") or "Chat de Testes",
+            "niche": b.get("niche") or "Ensaio Fotográfico",
+            "comprovante_id": comprovante,
+            "receipt_path": receipt,
+            "status": "booked"
+        })
+
+    return jsonify({"ok": True, "agendamentos": formatted, "count": len(formatted)})
+
+
 @app.route("/dashboard/status", methods=["POST"])
 @app.route("/bot/ativar", methods=["POST"])
 def update_studio_status():
@@ -2233,14 +2298,21 @@ def dashboard_simular_conversa():
     data = request.get_json(silent=True) or {}
     studio = get_active_studio(data.get("studio_id"))
     user_text = clean_input(data.get("text") or "Oi! Quero saber os horários de ensaio", 400)
-    wa_id = "5534999990000"
-    client_name = "Cliente Teste"
+    wa_id = f"teste_studio_{studio.get('id', 'principal')}"
 
+    # Recupera nome gravado nas mensagens anteriores se houver
     conn = get_db()
     c = conn.cursor()
     c.execute(
-        "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status) VALUES (?, ?, 'in', ?, ?, 'received')",
-        (studio["id"], wa_id, user_text, now_iso()),
+        "SELECT client_name FROM messages WHERE studio_id = ? AND wa_id = ? AND client_name IS NOT NULL AND client_name != '' ORDER BY id DESC LIMIT 1",
+        (studio["id"], wa_id),
+    )
+    prev_name_row = c.fetchone()
+    client_name = prev_name_row["client_name"] if prev_name_row else ""
+
+    c.execute(
+        "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name) VALUES (?, ?, 'in', ?, ?, 'received', ?)",
+        (studio["id"], wa_id, user_text, now_iso(), client_name),
     )
     conn.commit()
 
@@ -2256,10 +2328,10 @@ def dashboard_simular_conversa():
 
     c.execute(
         """
-        INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status)
-        VALUES (?, ?, 'out', ?, ?, 'sent')
+        INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name)
+        VALUES (?, ?, 'out', ?, ?, 'sent', ?)
         """,
-        (studio["id"], wa_id, reply_text, now_iso()),
+        (studio["id"], wa_id, reply_text, now_iso(), client_name),
     )
     conn.commit()
     conn.close()
@@ -2295,14 +2367,14 @@ def api_chat_teste_reset():
         return jsonify({"ok": False, "error": "Token inválido"}), 403
 
     studio = dict(st_row)
-    test_wa_id = "5534999990000"
+    test_wa_ids = ["5534999990000", f"teste_studio_{studio['id']}"]
 
     # Remove mensagens de teste
-    c.execute("DELETE FROM messages WHERE studio_id = ? AND wa_id = ?", (studio["id"], test_wa_id))
+    c.execute("DELETE FROM messages WHERE studio_id = ? AND wa_id IN (?, ?)", (studio["id"], test_wa_ids[0], test_wa_ids[1]))
     # Remove da fila de espera humana
-    c.execute("DELETE FROM waiting_queue WHERE client_phone = ?", (test_wa_id,))
+    c.execute("DELETE FROM waiting_queue WHERE client_phone IN (?, ?)", (test_wa_ids[0], test_wa_ids[1]))
     # Restaura status do estúdio para ACTIVE
-    c.execute("UPDATE studios SET status = 'active' WHERE id = ?", (studio["id"],))
+    c.execute("UPDATE studios SET status = 'ACTIVE' WHERE id = ?", (studio["id"],))
 
     conn.commit()
     conn.close()
@@ -2434,6 +2506,7 @@ def webhook():
                 "audio": data.get("audio") if isinstance(data.get("audio"), dict) else {"duration": data.get("audio_duration", 0)},
                 "client_name": str(data.get("client_name") or data.get("name") or data.get("pushName") or "Cliente"),
                 "from_me": bool(data.get("fromMe") or data.get("from_me")),
+                "is_self_chat": bool(data.get("is_self_chat")),
             }
         )
 
@@ -2445,13 +2518,29 @@ def webhook():
         msg_id = item["message_id"]
         wa_id = str(item["from"] or "")
         studio = get_active_studio()
+        logger.info("[WEBHOOK IN] msg_id=%s | wa_id=%s | client=%s | text=%s", msg_id, mask_wa_id(wa_id), item.get("client_name"), item.get("text"))
 
-        # 1. Filtro de Eco (ignora mensagens enviadas pelo próprio número do estúdio)
-        if (
+        # Atualiza phone_number_id se veio do gateway conectado e ainda não estava salvo
+        gw_phone = item.get("phone_number_id")
+        if gw_phone and gw_phone != studio.get("phone_number_id"):
+            try:
+                conn_u = get_db()
+                conn_u.execute("UPDATE studios SET phone_number_id = ? WHERE id = ?", (gw_phone, studio["id"]))
+                conn_u.commit()
+                conn_u.close()
+                studio["phone_number_id"] = gw_phone
+            except Exception:
+                pass
+
+        # 1. Filtro de Eco:
+        # Se for teste no próprio número (is_self_chat), permite o teste do fotógrafo!
+        # Caso contrário, ignora mensagens enviadas pelo próprio estúdio para não dar loop.
+        is_self_test = bool(item.get("is_self_chat"))
+        if not is_self_test and (
             item.get("from_me")
             or not wa_id
             or wa_id == studio.get("phone_number_id")
-            or (item.get("phone_number_id") and wa_id == item.get("phone_number_id"))
+            or (gw_phone and wa_id == gw_phone)
         ):
             logger.info("LOOP_PREVENTED: echo message ignored from %s", mask_wa_id(wa_id))
             return jsonify({"status": "ignored_echo"}), 200
@@ -2551,6 +2640,8 @@ def webhook():
         else:
             reply_text, receipt_url, set_waiting_human = gen_res
 
+        logger.info("[AI RESPONSE] wa_id=%s | reply='%s' | receipt=%s", mask_wa_id(wa_id), reply_text[:60], receipt_url)
+
         c.execute(
             """
             INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status)
@@ -2562,6 +2653,7 @@ def webhook():
         conn.close()
 
         send_whatsapp_message(studio, wa_id, reply_text, image_url=receipt_url)
+        logger.info("[WHATSAPP SENT] Resposta despachada com sucesso para %s", mask_wa_id(wa_id))
         responses.append(
             {
                 "wa_id": mask_wa_id(wa_id),
