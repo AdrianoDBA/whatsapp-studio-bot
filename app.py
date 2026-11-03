@@ -980,7 +980,7 @@ def detect_slot_choice(user_text: str, free_slots: list):
 
 
 def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, client_name: str):
-    """Trava o slot com 'locked' e confirma como 'booked', gerando o comprovante PNG com Pillow."""
+    """Trava o slot com 'locked' e confirma como 'booked', gerando o comprovante PNG com Pillow com tratamento de concorrência."""
     conn = get_db()
     c = conn.cursor()
     comprovante_id = uuid.uuid4().hex[:8]
@@ -993,7 +993,7 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
         else:
             final_client_name = f"Cliente ({mask_wa_id(client_wa_id)})"
 
-    # Passo 1: trava com status='locked' (prevenindo concorrência)
+    # Passo 1: trava com status='locked'
     c.execute(
         "UPDATE slots SET status = 'locked', client_wa_id = ?, client_name = ? WHERE id = ? AND status IN ('free', 'locked')",
         (client_wa_id, final_client_name, slot["id"]),
@@ -1010,11 +1010,28 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
         comprovante_id=comprovante_id,
         niche=niche_label
     )
-    c.execute(
-        "UPDATE slots SET status = 'booked', client_wa_id = ?, client_name = ?, niche = ?, comprovante_id = ?, receipt_path = ? WHERE id = ?",
-        (client_wa_id, final_client_name, niche_label, comprovante_id, png_url, slot["id"]),
-    )
-    conn.commit()
+
+    try:
+        c.execute(
+            "UPDATE slots SET status = 'booked', client_wa_id = ?, client_name = ?, niche = ?, comprovante_id = ?, receipt_path = ? WHERE id = ?",
+            (client_wa_id, final_client_name, niche_label, comprovante_id, png_url, slot["id"]),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        # Se este horário exato já possuía um registro 'booked' duplicado antigo, atualiza o registro booked existente
+        conn.rollback()
+        c.execute(
+            """
+            UPDATE slots 
+            SET client_wa_id = ?, client_name = ?, niche = ?, comprovante_id = ?, receipt_path = ?
+            WHERE studio_id = ? AND start_at = ? AND status = 'booked'
+            """,
+            (client_wa_id, final_client_name, niche_label, comprovante_id, png_url, studio["id"], slot["start_at"]),
+        )
+        # E remove o slot duplicado que ficou sobrando
+        c.execute("DELETE FROM slots WHERE id = ? AND status != 'booked'", (slot["id"],))
+        conn.commit()
+
     conn.close()
     return comprovante_id, png_url
 
@@ -2287,20 +2304,35 @@ def dashboard_simular_conversa():
     user_text = clean_input(data.get("text") or "Oi! Quero saber os horários de ensaio", 400)
     wa_id = f"teste_studio_{studio.get('id', 'principal')}"
 
-    # Recupera nome gravado nas mensagens anteriores se houver
+    # Recupera nome gravado nas mensagens anteriores se houver (com fallback resiliente se a coluna não existir)
     conn = get_db()
     c = conn.cursor()
-    c.execute(
-        "SELECT client_name FROM messages WHERE studio_id = ? AND wa_id = ? AND client_name IS NOT NULL AND client_name != '' ORDER BY id DESC LIMIT 1",
-        (studio["id"], wa_id),
-    )
-    prev_name_row = c.fetchone()
-    client_name = prev_name_row["client_name"] if prev_name_row else ""
+    client_name = ""
+    try:
+        c.execute(
+            "SELECT client_name FROM messages WHERE studio_id = ? AND wa_id = ? AND client_name IS NOT NULL AND client_name != '' ORDER BY id DESC LIMIT 1",
+            (studio["id"], wa_id),
+        )
+        prev_name_row = c.fetchone()
+        client_name = prev_name_row["client_name"] if prev_name_row else ""
+    except Exception:
+        # Se a coluna client_name ainda nao existir no sqlite de producao
+        try:
+            c.execute("ALTER TABLE messages ADD COLUMN client_name TEXT")
+            conn.commit()
+        except Exception:
+            pass
 
-    c.execute(
-        "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name) VALUES (?, ?, 'in', ?, ?, 'received', ?)",
-        (studio["id"], wa_id, user_text, now_iso(), client_name),
-    )
+    try:
+        c.execute(
+            "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name) VALUES (?, ?, 'in', ?, ?, 'received', ?)",
+            (studio["id"], wa_id, user_text, now_iso(), client_name),
+        )
+    except Exception:
+        c.execute(
+            "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status) VALUES (?, ?, 'in', ?, ?, 'received')",
+            (studio["id"], wa_id, user_text, now_iso()),
+        )
     conn.commit()
 
     res = generate_humanized_reply(studio, wa_id, client_name, user_text)
@@ -2313,13 +2345,22 @@ def dashboard_simular_conversa():
     if waiting_human:
         c.execute("UPDATE studios SET status = 'WAITING_HUMAN' WHERE id = ?", (studio["id"],))
 
-    c.execute(
-        """
-        INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name)
-        VALUES (?, ?, 'out', ?, ?, 'sent', ?)
-        """,
-        (studio["id"], wa_id, reply_text, now_iso(), client_name),
-    )
+    try:
+        c.execute(
+            """
+            INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name)
+            VALUES (?, ?, 'out', ?, ?, 'sent', ?)
+            """,
+            (studio["id"], wa_id, reply_text, now_iso(), client_name),
+        )
+    except Exception:
+        c.execute(
+            """
+            INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status)
+            VALUES (?, ?, 'out', ?, ?, 'sent')
+            """,
+            (studio["id"], wa_id, reply_text, now_iso()),
+        )
     conn.commit()
     conn.close()
 
