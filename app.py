@@ -2299,6 +2299,13 @@ def retomar_bot():
 @app.route("/dashboard/testar", methods=["POST"])
 @app.route("/simular-conversa", methods=["POST"])
 def dashboard_simular_conversa():
+    try:
+        return _dashboard_simular_conversa_impl()
+    except Exception as e:
+        logger.error("[SIMULAR_CONVERSA_ERROR] %s", e, exc_info=True)
+        return jsonify({"ok": False, "error": str(e), "trace": "logged"}), 500
+
+def _dashboard_simular_conversa_impl():
     data = request.get_json(silent=True) or {}
     studio = get_active_studio(data.get("studio_id"))
     user_text = clean_input(data.get("text") or "Oi! Quero saber os horários de ensaio", 400)
