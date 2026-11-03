@@ -229,10 +229,20 @@ def init_db():
             timestamp TEXT,
             transcribed_audio TEXT,
             status TEXT,
+            client_name TEXT,
             FOREIGN KEY(studio_id) REFERENCES studios(id)
         )
         """
     )
+
+    # Garante coluna client_name na tabela messages
+    try:
+        c.execute("PRAGMA table_info(messages)")
+        cols_msgs = [info[1] for info in c.fetchall()]
+        if "client_name" not in cols_msgs:
+            c.execute("ALTER TABLE messages ADD COLUMN client_name TEXT")
+    except Exception as e:
+        logger.warning("Migracao client_name em messages ignorada: %s", e)
 
     # 2b. waiting_queue (Controle por cliente: 10s takeover e 60s humano)
     c.execute(
@@ -406,7 +416,7 @@ def init_db():
                 default_id,
                 "Estúdio Luz & Arte",
                 "Gustavo",
-                "Clara",
+                "Bruna",
                 json.dumps(["gestante", "casamento", "ensaio", "corporativo"], ensure_ascii=False),
                 "450",
                 json.dumps(
@@ -1369,7 +1379,7 @@ def followup_30h_job(force_check: bool = False):
 
         client_short = f"Cliente {wa_id[-4:]}"
         studio_name = studio.get("studio_name") or "Estúdio"
-        secretary_name = studio.get("secretary_name") or "Clara"
+        secretary_name = studio.get("secretary_name") or "Bruna"
 
         if hours_since < 24.0:
             # Dentro da janela de 24h: mensagem humanizada
@@ -1435,9 +1445,9 @@ def reengagement_10s_60s_monitor():
     """
     Roda em thread separada a cada 1 segundo:
     1) WAITING_INITIAL_10S: Cliente enviou primeira mensagem -> fotógrafo tem 10s para responder.
-       Se passar 10s sem resposta humana, Clara assume o atendimento com boas-vindas calorosas!
+       Se passar 10s sem resposta humana, Bruna assume o atendimento com boas-vindas calorosas!
     2) WAITING_HUMAN: Cliente pediu para falar com Gustavo -> bot avisou que chamou Gustavo e aguarda 60s (1 min).
-       Se passar >60s sem resposta humana e followup_count < 2, Clara volta com proposta acolhedora:
+       Se passar >60s sem resposta humana e followup_count < 2, Bruna volta com proposta acolhedora:
        'Oi [Nome], vi que o Gustavo ainda está em sessão... Quer que eu anote um recado pra ele ou prefere consultar nossos horários livres?'
     """
     logger.info("Monitor de tempos de atendimento (10s e 60s) iniciado.")
@@ -1468,7 +1478,7 @@ def reengagement_10s_60s_monitor():
                 if not studio or studio.get("status") == "PAUSED":
                     continue
 
-                secretary_name = studio.get("secretary_name") or "Clara"
+                secretary_name = studio.get("secretary_name") or "Bruna"
                 photographer_name = studio.get("photographer_name") or "Gustavo"
                 studio_name = studio.get("studio_name") or "Estúdio"
                 first_n = client_name.split()[0] if client_name else ""
