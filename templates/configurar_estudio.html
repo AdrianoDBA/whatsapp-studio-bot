@@ -193,9 +193,9 @@
 
   <main>
     <div class="card">
-      <h1>Configurar Identidade e Portfólio 📸</h1>
+      <h1>Configurar Identidade e Pacotes de Casamento 💍</h1>
       <p style="color: var(--muted); font-size: 14.5px; line-height: 1.5;">
-        Configure sua secretária virtual e escolha quais nichos você atende. Já deixamos fotos de demonstração pré-carregadas para você começar na hora!
+        Configure a secretária virtual Bruna com a proposta oficial de casamento do Gustavo Alves Fotografia. Envie até 3 fotos reais para cada pacote: Essencial, Premium e Black!
       </p>
     </div>
 
@@ -206,12 +206,12 @@
           <div class="field">
             <label for="studio_name">Nome do Estúdio *</label>
             <span class="hint">Ex: Studio Luz & Arte</span>
-            <input type="text" id="studio_name" required maxlength="50" value="{{ studio.studio_name or 'Studio Luz & Arte' }}" />
+            <input type="text" id="studio_name" required maxlength="50" value="{{ studio.studio_name or 'Gustavo Alves Fotografia' }}" />
           </div>
           <div class="field">
             <label for="photographer_name">Seu Nome (Fotógrafo) *</label>
             <span class="hint">Ex: Gustavo ou Leo</span>
-            <input type="text" id="photographer_name" required maxlength="50" value="{{ studio.photographer_name or 'Gustavo' }}" />
+            <input type="text" id="photographer_name" required maxlength="50" value="{{ studio.photographer_name or 'Gustavo Alves' }}" />
           </div>
         </div>
 
@@ -219,116 +219,65 @@
           <div class="field">
             <label for="secretary_name">Nome da Secretária Virtual *</label>
             <span class="hint">Padrão sugerido: Lara</span>
-            <input type="text" id="secretary_name" required maxlength="50" value="{{ studio.secretary_name or 'Lara' }}" />
+            <input type="text" id="secretary_name" required maxlength="50" value="{{ studio.secretary_name or 'Bruna' }}" />
           </div>
           <div class="field">
             <label for="price">Valores e Pacotes de Ensaio *</label>
             <span class="hint">Ex: Ensaios a partir de R$ 450 (Sinal R$ 100)</span>
-            <input type="text" id="price" required maxlength="120" value="{{ studio.price or 'Ensaios a partir de R$ 450' }}" />
+            <input type="text" id="price" required maxlength="120" value="{{ studio.price or 'Essencial R$ 7.500 | Premium R$ 8.800 | Black R$ 11.350' }}" />
           </div>
         </div>
       </div>
 
       <div class="card" style="margin-top: 20px;">
-        <h2>2. Nichos de Atuação e Portfólio (3 Fotos por Especialidade)</h2>
+        <h2>2. Pacotes Oficiais de Casamento (Envie 3 Fotos por Pacote)</h2>
         <p style="font-size: 13.5px; color: var(--muted);">
-          Ative os nichos que você fotografa. Se desmarcar um nicho, a secretária não o oferecerá aos clientes. As fotos já vêm pré-carregadas com modelos de alta qualidade para teste.
+          Envie 3 fotos para cada pacote: <strong>Essencial</strong>, <strong>Premium</strong> e <strong>Black</strong>. As fotos serão enviadas automaticamente pela Bruna aos clientes no WhatsApp.
         </p>
 
-        <!-- Bloco 1: Gestante -->
-        <div class="niche-block" id="block_gestante">
+        <!-- Pacote 1: Essencial -->
+        <div class="niche-block" id="block_portfolio_essencial">
           <div class="niche-header">
             <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_gestante" onchange="alternarBlocoNicho('gestante')" {% if 'gestante' in active_niches %}checked{% endif %} />
-              <span>🤰 Ensaio Gestante</span>
+              <input type="checkbox" id="toggle_portfolio_essencial" onchange="alternarBlocoNicho('portfolio_essencial')" checked />
+              <span>💍 Pacote Essencial (R$ 7.500 - 9h de Cobertura)</span>
             </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">3 Fotos • 800px / 70%</span>
           </div>
-          <div class="photos-grid" id="grid_gestante"></div>
+          <p style="font-size: 12.5px; color: var(--muted); margin: 4px 0 10px;">
+            Making of, 2 fotógrafos, 800+ fotos em alta resolução, galeria privada em até 60 dias úteis.
+          </p>
+          <div class="photos-grid" id="grid_portfolio_essencial"></div>
         </div>
 
-        <!-- Bloco 2: Newborn -->
-        <div class="niche-block" id="block_newborn">
+        <!-- Pacote 2: Premium -->
+        <div class="niche-block" id="block_portfolio_premium">
           <div class="niche-header">
             <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_newborn" onchange="alternarBlocoNicho('newborn')" {% if 'newborn' in active_niches %}checked{% endif %} />
-              <span>👶 Ensaio Newborn</span>
+              <input type="checkbox" id="toggle_portfolio_premium" onchange="alternarBlocoNicho('portfolio_premium')" checked />
+              <span>⭐ Pacote Premium (R$ 8.800 - 10h + Pré-Wedding 2h Incluso)</span>
             </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">3 Fotos • Mais Contratado</span>
           </div>
-          <div class="photos-grid" id="grid_newborn"></div>
+          <p style="font-size: 12.5px; color: var(--muted); margin: 4px 0 10px;">
+            10h de cobertura, 2 fotógrafos, 1000+ fotos, galeria privada e ensaio pré-wedding de 2h já incluso.
+          </p>
+          <div class="photos-grid" id="grid_portfolio_premium"></div>
         </div>
 
-        <!-- Bloco 3: Família -->
-        <div class="niche-block" id="block_familia">
+        <!-- Pacote 3: Black -->
+        <div class="niche-block" id="block_portfolio_black">
           <div class="niche-header">
             <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_familia" onchange="alternarBlocoNicho('familia')" {% if 'familia' in active_niches %}checked{% endif %} />
-              <span>👨‍👩‍👧 Ensaio Família</span>
+              <input type="checkbox" id="toggle_portfolio_black" onchange="alternarBlocoNicho('portfolio_black')" checked />
+              <span>🖤 Pacote Black (R$ 11.350 - 3 Fotógrafos + Civil + Ensaio 3h + Quadro)</span>
             </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
+            <span style="font-size: 12px; color: var(--green); font-weight: 700;">3 Fotos • Experiência VIP</span>
           </div>
-          <div class="photos-grid" id="grid_familia"></div>
-        </div>
-
-        <!-- Bloco 4: Casamento -->
-        <div class="niche-block" id="block_casamento">
-          <div class="niche-header">
-            <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_casamento" onchange="alternarBlocoNicho('casamento')" {% if 'casamento' in active_niches %}checked{% endif %} />
-              <span>💍 Ensaio Casamento & Pré-Wedding</span>
-            </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
-          </div>
-          <div class="photos-grid" id="grid_casamento"></div>
-        </div>
-
-        <!-- Bloco 5: Formatura -->
-        <div class="niche-block" id="block_formatura">
-          <div class="niche-header">
-            <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_formatura" onchange="alternarBlocoNicho('formatura')" {% if 'formatura' in active_niches %}checked{% endif %} />
-              <span>🎓 Ensaio Formatura & Becas</span>
-            </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
-          </div>
-          <div class="photos-grid" id="grid_formatura"></div>
-        </div>
-
-        <!-- Bloco 6: Casal -->
-        <div class="niche-block" id="block_casal">
-          <div class="niche-header">
-            <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_casal" onchange="alternarBlocoNicho('casal')" {% if 'casal' in active_niches %}checked{% endif %} />
-              <span>❤️ Ensaio Casal & Namorados</span>
-            </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
-          </div>
-          <div class="photos-grid" id="grid_casal"></div>
-        </div>
-
-        <!-- Bloco 7: Corporativo -->
-        <div class="niche-block" id="block_corporativo">
-          <div class="niche-header">
-            <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_corporativo" onchange="alternarBlocoNicho('corporativo')" {% if 'corporativo' in active_niches %}checked{% endif %} />
-              <span>💼 Retrato Corporativo & Profissional</span>
-            </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
-          </div>
-          <div class="photos-grid" id="grid_corporativo"></div>
-        </div>
-
-        <!-- Bloco 8: 15 Anos -->
-        <div class="niche-block" id="block_15anos">
-          <div class="niche-header">
-            <label class="niche-toggle-label">
-              <input type="checkbox" id="toggle_15anos" onchange="alternarBlocoNicho('15anos')" {% if '15anos' in active_niches %}checked{% endif %} />
-              <span>👑 Ensaio 15 Anos & Debutante</span>
-            </label>
-            <span style="font-size: 12px; color: var(--green); font-weight: 700;">800px / 70%</span>
-          </div>
-          <div class="photos-grid" id="grid_15anos"></div>
+          <p style="font-size: 12.5px; color: var(--muted); margin: 4px 0 10px;">
+            10h de cobertura, 3 fotógrafos (1 dedicado a decoração/família), 2000+ fotos, civil, ensaio 3h, quadro 25x30 + porta-retrato.
+          </p>
+          <div class="photos-grid" id="grid_portfolio_black"></div>
         </div>
       </div>
 
@@ -355,7 +304,7 @@
 
   <script>
     const DASHBOARD_CHAVE = '{{ studio.dashboard_token }}';
-    const ALL_NICHES = ['gestante', 'newborn', 'familia', 'casamento', 'formatura', 'casal', 'corporativo', '15anos'];
+    const ALL_NICHES = ['portfolio_essencial', 'portfolio_premium', 'portfolio_black'];
     let fotosData = {};
     ALL_NICHES.forEach(n => { fotosData[n] = []; });
 

@@ -299,6 +299,47 @@ def init_db():
         """
     )
 
+    # 7. portfolio_fotos (Essencial, Premium, Black)
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS portfolio_fotos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            studio_id TEXT,
+            pacote TEXT,
+            image_url TEXT,
+            created_at TEXT
+        )
+        """
+    )
+
+    # 8. contacts (cliente, amigo, familia)
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            studio_id TEXT,
+            phone TEXT,
+            name TEXT,
+            tipo TEXT DEFAULT 'cliente',
+            created_at TEXT,
+            UNIQUE(studio_id, phone)
+        )
+        """
+    )
+
+    # 9. blocked_dates
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS blocked_dates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            studio_id TEXT,
+            date_str TEXT,
+            reason TEXT,
+            created_at TEXT
+        )
+        """
+    )
+
     conn.commit()
 
     # Migrações seguras com PRAGMA table_info
@@ -309,7 +350,15 @@ def init_db():
     if 'status' not in st_cols:
         c.execute("ALTER TABLE studios ADD COLUMN status TEXT DEFAULT 'configurando'")
     if 'active_niches' not in st_cols:
-        c.execute("""ALTER TABLE studios ADD COLUMN active_niches TEXT DEFAULT '["gestante", "newborn", "familia"]'""")
+        c.execute("""ALTER TABLE studios ADD COLUMN active_niches TEXT DEFAULT '["essencial", "premium", "black"]'""")
+    if 'mode' not in st_cols:
+        c.execute("ALTER TABLE studios ADD COLUMN mode TEXT DEFAULT 'NORMAL'")
+    if 'google_review_url' not in st_cols:
+        c.execute("ALTER TABLE studios ADD COLUMN google_review_url TEXT DEFAULT 'https://g.page/r/gustavoalvsfotografia/review'")
+    if 'instagram_url' not in st_cols:
+        c.execute("ALTER TABLE studios ADD COLUMN instagram_url TEXT DEFAULT 'https://instagram.com/gustavoalvsfotografia'")
+    if 'packages_json' not in st_cols:
+        c.execute("ALTER TABLE studios ADD COLUMN packages_json TEXT")
 
     c.execute("PRAGMA table_info(slots)")
     slot_cols = [r['name'] if isinstance(r, dict) else r[1] for r in c.fetchall()]
@@ -317,6 +366,9 @@ def init_db():
         c.execute("ALTER TABLE slots ADD COLUMN niche TEXT DEFAULT 'Geral'")
     if 'receipt_path' not in slot_cols:
         c.execute("ALTER TABLE slots ADD COLUMN receipt_path TEXT")
+    if 'locked_at' not in slot_cols:
+        c.execute("ALTER TABLE slots ADD COLUMN locked_at REAL DEFAULT 0")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_slots_unique_booked ON slots(studio_id, start_at) WHERE status='booked'")
 
     c.execute("CREATE INDEX IF NOT EXISTS idx_studios_dashboard_token ON studios(dashboard_token)")
     conn.commit()
@@ -897,33 +949,31 @@ def transcribe_audio_with_gemini(audio_bytes: bytes = None, mime_type: str = "au
     return "Olá, gostaria de saber os horários disponíveis para ensaio fotográfico."
 
 
-def build_system_prompt(studio: dict, free_slots: list) -> str:
-    secretary_name = studio.get("secretary_name") or "Clara"
-    studio_name = studio.get("studio_name") or "Estúdio"
-    photographer_name = studio.get("photographer_name") or "Gustavo"
-    price = studio.get("price") or "450"
-    niches_raw = studio.get("niches") or "[]"
-    try:
-        niches = ", ".join(json.loads(niches_raw))
-    except Exception:
-        niches = str(niches_raw)
-
+def build_system_prompt(studio: dict, free_slots: list, tipo_contato: str = 'cliente') -> str:
+    secretary_name = studio.get("secretary_name") or "Bruna"
+    studio_name = studio.get("studio_name") or "Gustavo Alves Fotografia"
+    photographer_name = studio.get("photographer_name") or "Gustavo Alves"
     slots_str = ", ".join([s["human"] for s in free_slots]) if free_slots else "Terça às 15h, Quarta às 10h, Sábado às 16h"
 
     return (
-        f"Você é {secretary_name}, a secretária atenciosa do {studio_name} do fotógrafo {photographer_name}.\n"
-        f"Suas diretrizes fundamentais de atendimento:\n"
-        f"1. Fale como uma pessoa real no WhatsApp: frases naturais, ágeis, calorosas e no máximo 1 emoji por mensagem.\n"
-        f"2. NUNCA diga que é robô, inteligência artificial ou bot. Se perguntarem, diga que é a {secretary_name} e trabalha no estúdio.\n"
-        f"3. NUNCA chame a pessoa pelo vocativo genérico 'Cliente'. Se ainda não souber o nome dela, pergunte com carinho como pode chamá-la.\n"
-        f"4. Siga este fluxo guiado e determinístico:\n"
-        f"   - Passo 1: Saudação espelhada (Bom dia / Boa tarde / Boa noite) + perguntar o nome da pessoa.\n"
-        f"   - Passo 2: Descobrir o estilo do ensaio desejado entre os nichos ativos do estúdio ({niches}), informando que o investimento começa a partir de R$ {price}.\n"
-        f"   - Passo 3: Apresentar EXATAMENTE 3 opções reais de horários livres da nossa agenda: {slots_str}.\n"
-        f"   - Passo 4: Assim que a pessoa confirmar a opção de dia e horário, confirme a reserva com alegria, informando que o comprovante oficial foi gerado e que o {photographer_name} já foi notificado.\n"
-        f"5. Se a pessoa pedir expressamente para falar com o fotógrafo ou pedir desconto fora da tabela, responda acolhedoramente: 'Com certeza! Já avisei o {photographer_name} aqui, só 1 minutinho que ele já vem falar com você' e transfira."
+        f"Você é a {secretary_name}, secretária virtual do {studio_name}. WhatsApp (34)98444-2454. Instagram @gustavoalvsfotografia.\n\n"
+        "VOCÊ CONHECE A PROPOSTA DE COR:\n"
+        "- Essencial R$7.500: 09h, making of, 2 fotógrafos, 800+ fotos alta, galeria privada até 60 dias úteis\n"
+        "- Premium R$8.800: 10h, 2 fotógrafos, 1000+ fotos, galeria, ensaio pré-casamento 2h incluso. R$1.300 a mais que Essencial (Mais contratado!)\n"
+        "- Black R$11.350: 10h, 2000+ fotos, civil, ensaio 3h, galeria, bruto opcional, 3 fotógrafos (1 só decoração/família), making of, quadro 25x30 + 10x15. R$2.550 a mais que Premium\n"
+        "- Extras: pré-casamento avulso R$1.500, civil R$800, hora extra R$1.000, fotógrafo extra R$1.000, pacote 3h R$2.250, entrega expressa R$1.500, álbum 25x30 caixa 60p ~120 fotos R$4.950\n\n"
+        "- Experiência: antes fazemos reunião prévia e briefing detalhado; no dia cobertura completa making of à festa com olhar artístico, documental e editorial; pós curadoria e edição artesanal com tratamento profissional de cor; entrega galeria online privada exclusiva.\n\n"
+        "REGRAS DE VENDAS:\n"
+        "- Nunca passe preço seco. Primeiro qualifica: data e local do casamento, quantos convidados, onde nos achou.\n"
+        "- Depois manda 3 fotos do pacote que faz sentido (se não tem data de pré, oferece Premium/Black)\n"
+        "- Fala dos pacotes em ordem Essencial->Premium->Black e destaca que Premium é o mais contratado\n"
+        "- Se cliente pede só civil ou só ensaio, ofereça personalização da página 04/04\n"
+        f"- Para agendar reunião/visita: ofereça 3 horários livres de slots ({slots_str}), trava anti-choque locked 5min, UNIQUE anti-duplo, gera comprovante PNG #ID\n"
+        "- Se for amigo/familia (classificado em contacts como amigo/familia) responda curto 'Oi! É a Bruna, o Gustavo tá em ensaio, quer que eu passe recado?' sem vender.\n"
+        "- Se modo Não Perturbe ligado, continue agendando 24h mas não notifique o Gustavo, salve como pendente_amanha.\n"
+        "- 1 dia após casamento, envie pedido de avaliação: 'Amou as fotos? Deixa avaliação no Google/Instagram @gustavoalvsfotografia' com links de studios.google_review_url e instagram_url.\n"
+        f"Tipo contato: {tipo_contato}"
     )
-
 
 def detect_slot_choice(user_text: str, free_slots: list):
     """Verifica se o cliente escolheu um dos horários livres oferecidos."""
@@ -1008,18 +1058,37 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
 
 def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_text: str):
     """
-    Processa a mensagem do cliente com todas as regras de negócio:
-    - Saudação contextual espelhada (Bom dia/Boa tarde/Boa noite)
-    - Proibição absoluta do termo "Cliente" (pergunta "Como posso te chamar?" se desconhecido)
-    - Suporte a botões interativos clicáveis e nichos ativos configurados
-    - Gemini 1.5 Flash com persona humanizada da secretária
+    Processa a mensagem do cliente com a proposta oficial do Gustavo Alves Fotografia:
+    - 3 Pacotes Oficiais: Essencial (R$ 7.500), Premium (R$ 8.800 - Mais Contratado) e Black (R$ 11.350)
+    - Extras: Pré-casamento (R$ 1.500), Civil (R$ 800), Hora extra (R$ 1.000), Álbum (R$ 4.950)
+    - Contatos tipo amigo/familia: Responde curto sem vender
+    - Chamada Gemini 1.5 Flash integrada
     Retorna: (reply_text, media_url, waiting_human, options_list)
     """
-    secretary_name = studio.get("secretary_name") or "Clara"
-    studio_name = studio.get("studio_name") or "Estúdio"
-    photographer_name = studio.get("photographer_name") or "Gustavo"
-    price = studio.get("price") or "450"
+    secretary_name = studio.get("secretary_name") or "Bruna"
+    studio_name = studio.get("studio_name") or "Gustavo Alves Fotografia"
+    photographer_name = studio.get("photographer_name") or "Gustavo Alves"
     low = user_text.lower().strip()
+
+    # Consulta tipo de contato na tabela contacts (cliente, amigo, familia)
+    tipo_contato = 'cliente'
+    try:
+        conn_c = get_db()
+        c_c = conn_c.cursor()
+        c_c.execute("SELECT tipo, name FROM contacts WHERE studio_id = ? AND phone = ?", (studio["id"], wa_id))
+        c_row = c_c.fetchone()
+        conn_c.close()
+        if c_row:
+            tipo_contato = (c_row["tipo"] or 'cliente').lower()
+            if not client_name and c_row["name"]:
+                client_name = c_row["name"]
+    except Exception:
+        pass
+
+    # Regra: Amigo ou Família não recebe script de vendas
+    if tipo_contato in ['amigo', 'familia', 'família']:
+        reply = f"Oi! É a {secretary_name}, o {photographer_name} tá em ensaio no momento. Quer que eu passe algum recado pra ele?"
+        return limit_to_one_emoji(reply), None, False, ["Deixar Recado", "Falar com Fotógrafo"]
 
     # Validação e saneamento do nome (JAMAIS usar termo "Cliente")
     is_known_name = bool(
@@ -1030,53 +1099,27 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
     )
     first_name = client_name.split()[0] if is_known_name else ""
 
-    # Carrega nichos ativos do estúdio
-    active_niches_raw = studio.get('active_niches') or studio.get('niches') or '["gestante", "newborn", "familia"]'
-    try:
-        active_niches = json.loads(active_niches_raw)
-        if isinstance(active_niches, list) and active_niches and isinstance(active_niches[0], str) and "," in active_niches[0]:
-            active_niches = [n.strip() for n in active_niches[0].split(",")]
-    except Exception:
-        active_niches = ["gestante", "newborn", "familia"]
-    if not active_niches:
-        active_niches = ["gestante", "newborn", "familia"]
-
-    niche_names_map = {
-        "gestante": "Gestante",
-        "newborn": "Newborn",
-        "familia": "Família",
-        "casamento": "Casamento",
-        "formatura": "Formatura",
-        "casal": "Casal",
-        "corporativo": "Corporativo",
-        "15anos": "15 Anos"
-    }
-    available_niches_labels = [niche_names_map.get(n.lower(), n.title()) for n in active_niches]
-    niches_formatted = ", ".join(available_niches_labels) if available_niches_labels else "Gestante, Newborn e Família"
-
-    # Opções padrão interativas para menus rápidos
-    interactive_niche_options = [f"📸 {lbl}" for lbl in available_niches_labels[:3]]
-    if len(interactive_niche_options) < 3:
-        interactive_niche_options.append("📅 Ver Horários")
+    # Opções padrão dos 3 pacotes reais do Gustavo
+    interactive_niche_options = ["💍 Essencial", "⭐ Premium", "👑 Black"]
 
     # 1. Pergunta se é robô / IA / bot
     if any(w in low for w in ["robô", "robo", "você é ia", "voce e ia", "assistente virtual", "é um bot", "e um bot"]):
-        reply = f"Sou a {secretary_name}, trabalho aqui no estúdio com o {photographer_name} 😊 Posso te ajudar a ver nossos horários ou tirar dúvidas sobre os ensaios!"
-        return limit_to_one_emoji(reply), None, False, ["Ver Ensaios", "Ver Horários", "Falar com Fotógrafo"]
+        reply = f"Sou a {secretary_name}, secretária virtual aqui do estúdio do {photographer_name} 😊 Como posso te ajudar hoje?"
+        return limit_to_one_emoji(reply), None, False, ["Conhecer Pacotes", "Ver Horários", "Falar com Gustavo"]
 
     # 2. Pedido de atendimento com humano / Gustavo / fotógrafo -> WAITING_HUMAN
     wants_human_patterns = [
-        r"humano",
-        r"atendente",
-        r"pessoa",
-        r"falar com",
-        r"chamar",
-        r"chama o",
-        r"falar com o fotografo",
-        r"falar com o fotógrafo",
-        r"desconto fora",
-        r"desconto maior",
-        rf"{re.escape(photographer_name.lower())}",
+        r"\bhumano\b",
+        r"\batendente\b",
+        r"\bpessoa\b",
+        r"\bfalar com\b",
+        r"\bchamar\b",
+        r"\bchama o\b",
+        r"\bfalar com o fotografo\b",
+        r"\bfalar com o fotógrafo\b",
+        r"\bdesconto fora\b",
+        r"\bdesconto maior\b",
+        rf"\b{re.escape(photographer_name.lower())}\b",
     ]
     if any(re.search(pat, low) for pat in wants_human_patterns):
         now_ts = time.time()
@@ -1102,7 +1145,7 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         reply = f"Com certeza{vocativo}! Já avisei o {photographer_name} aqui, só 1 minutinho que ele já vem falar com você 🙏"
         return limit_to_one_emoji(reply), None, True, []
 
-    # 3. Consulta 3 horários reais livres
+    # 3. Consulta 3 horários reais livres da tabela slots
     ensure_slots_for_studio(studio["id"])
     free_slots = get_three_free_slots(studio["id"])
     slots_text = ", ".join([s["human"] for s in free_slots])
@@ -1111,17 +1154,18 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
     # 4. Verifica se o cliente escolheu um horário para agendar
     chosen_slot = detect_slot_choice(user_text, free_slots)
     if chosen_slot:
-        niche_detect = "Ensaio Fotográfico"
-        for nk, nlbl in niche_names_map.items():
-            if nk in low or nlbl.lower() in low:
-                niche_detect = f"Ensaio {nlbl}"
-                break
+        niche_detect = "Casamento - Pacote Premium"
+        if "essencial" in low:
+            niche_detect = "Casamento - Pacote Essencial"
+        elif "black" in low:
+            niche_detect = "Casamento - Pacote Black"
+
         chosen_slot["niche"] = niche_detect
         comp_id, png_url = book_slot_and_generate_receipt(studio, chosen_slot, wa_id, client_name if is_known_name else "")
         vocativo = f", {first_name}" if first_name else ""
         reply = (
-            f"Prontinho{vocativo}! Reservei {chosen_slot['human']} para você aqui no {studio_name} 📸 "
-            f"Acabei de gerar seu comprovante oficial (#{comp_id.upper()}) e já avisei o {photographer_name}!"
+            f"Prontinho{vocativo}! Reservei {chosen_slot['human']} para nossa reunião/visita com o {photographer_name} 📸 "
+            f"Acabei de gerar seu comprovante oficial (#{comp_id.upper()}) e já avisei o Gustavo!"
         )
         conn = get_db()
         c = conn.cursor()
@@ -1130,103 +1174,71 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         conn.close()
         return limit_to_one_emoji(reply), png_url, False, ["Ver Outros Dias", "Tirar Dúvida", "Falar com Fotógrafo"]
 
-    # 4b. Se o cliente pediu para ver ensaios / fotos / portfólio / estilos / nichos específicos
-    ensaio_triggers = [
-        "ensaio", "ensaios", "ver ensaio", "ver ensaios", "ver foto", "ver fotos",
-        "foto", "fotos", "portfólio", "portfolio", "trabalhos", "estilos", "modelos",
-        "casal", "gestante", "casamento", "corporativo", "newborn", "família", "familia",
-        "formatura", "15anos", "15 anos", "debutante", "exemplo"
-    ]
-    is_ensaio_request = any(re.search(rf"\b{re.escape(w)}\b", low) for w in ensaio_triggers)
-    if is_ensaio_request:
-        raw_photos = studio.get("photos") or "{}"
-        photos_by_niche = {}
-        try:
-            parsed_photos = json.loads(raw_photos)
-            if isinstance(parsed_photos, dict):
-                photos_by_niche = ensure_demo_photos(parsed_photos)
-            elif isinstance(parsed_photos, list):
-                photos_by_niche = ensure_demo_photos({"gestante": parsed_photos})
-        except Exception:
-            photos_by_niche = ensure_demo_photos({})
-
-        detected_niche = None
-        for n in ["casamento", "formatura", "gestante", "newborn", "família", "familia", "casal", "corporativo", "15anos", "15 anos", "debutante"]:
-            if re.search(rf"\b{re.escape(n)}\b", low):
-                clean_n = n.replace("í", "i").replace("15 anos", "15anos").replace("debutante", "15anos")
-                detected_niche = clean_n
-                break
-
-        target_photos = []
-        if detected_niche and photos_by_niche:
-            target_photos = photos_by_niche.get(detected_niche) or []
-
-        if not target_photos:
-            first_niche_key = active_niches[0].lower().replace("í", "i") if active_niches else "gestante"
-            target_photos = photos_by_niche.get(first_niche_key) or []
-
-        if target_photos:
-            nicho_label = niche_names_map.get(detected_niche, detected_niche.title() if detected_niche else niches_formatted)
-            for idx, p_url in enumerate(target_photos[:3], 1):
-                send_whatsapp_message(studio, wa_id, f"Exemplo {idx}/{min(len(target_photos), 3)} - {nicho_label} • {studio_name}", image_url=p_url)
-            vocativo = f", {first_name}" if first_name else ""
-            reply = (
-                f"Acabei de te mandar fotos de exemplo dos nossos trabalhos de {nicho_label} aqui no {studio_name} 📸 "
-                f"Nossos pacotes começam a partir de R$ {price}. Tenho estes horários livres{vocativo}: {slots_text}. Qual deles fica melhor para você?"
-            )
-            return limit_to_one_emoji(reply), target_photos[0], False, slot_options
-        else:
-            vocativo = f", {first_name}" if first_name else ""
-            reply = (
-                f"Aqui no {studio_name} nós fazemos ensaios lindos de {niches_formatted}! ✨ "
-                f"Nossos pacotes começam a partir de R$ {price}. Tenho livres{vocativo}: {slots_text}. Gostaria de garantir um desses horários?"
-            )
-            return limit_to_one_emoji(reply), None, False, slot_options
-
-    # 4c. Se o cliente perguntou especificamente sobre preço ou valores
-    if any(w in low for w in ["quanto custa", "valor", "valores", "preço", "preco", "tabela", "pacote", "pacotes"]):
+    # 4b. Consultas sobre Pacotes específicos do PDF
+    if any(w in low for w in ["essencial", "pacote essencial"]):
         reply = (
-            f"Nossos pacotes de ensaio aqui no {studio_name} começam em R$ {price} e incluem as fotos editadas em alta resolução ✨ "
-            f"Temos horários livres: {slots_text}. Quer que eu reserve algum para você?"
+            "O Pacote Essencial (R$ 7.500) inclui: 09h de cobertura, making of dos noivos, 2 fotógrafos, "
+            "800+ fotos em alta resolução tratadas e galeria privada em até 60 dias úteis ✨ "
+            f"Gostaria de agendar uma reunião para conversarmos? Nossos horários livres mais próximos são: {slots_text}."
         )
         return limit_to_one_emoji(reply), None, False, slot_options
 
-    # 4d. Se o cliente perguntou sobre horários / datas / disponibilidade ou clicou em 'Ver Outros Dias'
-    if any(w in low for w in ["horário", "horario", "datas", "quando tem", "agenda", "disponibilidade", "ver outros dias", "outros dias", "outras datas", "outros horários", "outros horarios"]):
+    if any(w in low for w in ["premium", "pacote premium"]):
+        reply = (
+            "O Pacote Premium (R$ 8.800) é o nosso mais contratado! Inclui: 10h de cobertura, 2 fotógrafos, "
+            "1000+ fotos em alta resolução, galeria online e o ensaio pré-casamento de 2h já incluso "
+            "(apenas R$ 1.300 a mais que o Essencial) 💍 "
+            f"Quer garantir esse pacote ou agendar um horário para tirar dúvidas? Próximas datas: {slots_text}."
+        )
+        return limit_to_one_emoji(reply), None, False, slot_options
+
+    if any(w in low for w in ["black", "pacote black"]):
+        reply = (
+            "O Pacote Black (R$ 11.350) é a nossa experiência mais completa: 10h de cobertura, 3 fotógrafos "
+            "(1 exclusivo para decoração e família), 2000+ fotos, casamento civil incluso, ensaio de 3h, "
+            "arquivos brutos opcionais, making of e quadro 25x30 + 10x15 ✨ "
+            f"Podemos agendar uma conversa para planejar os detalhes? Horários livres: {slots_text}."
+        )
+        return limit_to_one_emoji(reply), None, False, slot_options
+
+    # 4c. Consultas gerais de valores / preços
+    if any(w in low for w in ["quanto custa", "valor", "valores", "preço", "preco", "tabela", "pacote", "pacotes", "proposta"]):
+        reply = (
+            "Trabalhamos com 3 opções principais de cobertura para casamento: "
+            "Essencial (R$ 7.500), Premium com pré-wedding incluso (R$ 8.800 - Mais Contratado) e Black Completo (R$ 11.350). "
+            f"Qual deles combina mais com o estilo do casamento de vocês? Próximos horários para reunião: {slots_text}."
+        )
+        return limit_to_one_emoji(reply), None, False, interactive_niche_options
+
+    # 4d. Consulta de datas e horários
+    if any(w in low for w in ["horário", "horario", "datas", "quando tem", "agenda", "disponibilidade", "ver outros dias", "outros dias"]):
         reply = f"Tenho estas opções livres na nossa agenda agora: {slots_text}. Qual delas fica melhor para você?"
         return limit_to_one_emoji(reply), None, False, slot_options
 
-    # 4e. Saudação Contextual Espelhada e Humanizada (sem jargão nem vocativo 'Cliente')
+    # 4e. Saudação inicial espelhada
     if any(w in low for w in ["oi", "ola", "olá", "bom dia", "boa tarde", "boa noite", "opa", "oie", "tudo bem", "td bem"]):
         current_hour = now_sp().hour
-        if "bom dia" in low:
+        if "bom dia" in low or current_hour < 12:
             saudacao_tempo = "Bom dia! ☀️ Tudo bem com você?"
-        elif "boa tarde" in low:
+        elif "boa tarde" in low or current_hour < 18:
             saudacao_tempo = "Boa tarde! ✨ Tudo ótimo por aqui, e com você?"
-        elif "boa noite" in low:
-            saudacao_tempo = "Boa noite! 🌙 Tudo bem?"
         else:
-            if current_hour < 12:
-                saudacao_tempo = "Bom dia! ☀️ Tudo bem com você?"
-            elif current_hour < 18:
-                saudacao_tempo = "Boa tarde! ✨ Tudo ótimo por aqui, e com você?"
-            else:
-                saudacao_tempo = "Boa noite! 🌙 Tudo bem?"
+            saudacao_tempo = "Boa noite! 🌙 Tudo bem?"
 
         if is_known_name:
             greeting = f"{saudacao_tempo} Aqui é a {secretary_name}, do {studio_name} 😊 "
-            greeting += f"O {photographer_name} tá em estúdio agora, mas posso te atender! Você gostaria de conhecer nossos ensaios ({niches_formatted}) ou consultar as datas livres?"
+            greeting += f"O {photographer_name} tá em ensaio agora, mas posso te atender! Você gostaria de conhecer nossos pacotes de casamento (Essencial, Premium, Black) ou consultar as datas livres?"
         else:
             greeting = f"{saudacao_tempo} Aqui é a {secretary_name}, do {studio_name} 😊 "
-            greeting += f"Como posso te chamar? Posso te apresentar nossos ensaios ({niches_formatted}) ou consultar os horários livres na agenda!"
+            greeting += "Como posso te chamar? Para quando vocês estão planejando o casamento?"
 
         return limit_to_one_emoji(greeting), None, False, interactive_niche_options
 
     # 4f. Se o usuário enviou o nome dele (resposta a 'Como posso te chamar?')
     words = user_text.strip().split()
-    niche_words = ["gestante", "newborn", "familia", "família", "casamento", "formatura", "casal", "corporativo", "15anos", "15 anos", "debutante"]
+    niche_words = ["essencial", "premium", "black", "casamento", "ensaio", "foto", "fotos", "preço", "preco", "horário", "horario"]
     action_words = ["ver", "olhar", "tirar", "dúvida", "duvida", "falar", "ajuda", "agendar", "marcar", "reservar", "outro", "outros", "outras"]
-    if not is_known_name and len(words) <= 3 and not any(re.search(rf"{re.escape(w)}", low) for w in ["ensaio", "ensaios", "foto", "fotos", "preço", "preco", "horário", "horario", "dia", "dias", "sim", "não", "nao"] + niche_words + action_words):
+    if not is_known_name and len(words) <= 3 and not any(re.search(rf"\b{re.escape(w)}\b", low) for w in ["sim", "não", "nao", "dia", "dias"] + niche_words + action_words):
         clean_cand = " ".join([w.capitalize() for w in words if w.isalpha()])
         if clean_cand:
             try:
@@ -1240,12 +1252,13 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             first_name = clean_cand.split()[0]
             reply = (
                 f"Prazer em te conhecer, {first_name}! 📸 "
-                f"Aqui no {studio_name} trabalhamos com {niches_formatted}. Quer dar uma olhada nas fotos de exemplo ou ver os dias livres na nossa agenda?"
+                "Aqui no Gustavo Alves Fotografia nós cobrimos casamentos com olhar documental e artístico. "
+                "Vocês já têm a data e local definidos?"
             )
             return limit_to_one_emoji(reply), None, False, interactive_niche_options
 
-    # 5. Chama Gemini 1.5 Flash com histórico recente e prompt humanizado
-    system_prompt = build_system_prompt(studio, free_slots)
+    # 5. Chama Gemini 1.5 Flash com histórico recente e o Prompt Oficial da Proposta
+    system_prompt = build_system_prompt(studio, free_slots, tipo_contato=tipo_contato)
 
     if genai_model:
         try:
@@ -1258,14 +1271,14 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
             history_rows = list(reversed(c.fetchall()))
             conn.close()
             hist_lines = [
-                f"{(first_name or 'Visitante') if r['direction'] == 'in' else secretary_name}: {r['content']}"
+                f"{(first_name or 'Noivo(a)') if r['direction'] == 'in' else secretary_name}: {r['content']}"
                 for r in history_rows
             ]
             full_prompt = (
                 f"{system_prompt}\n\n"
                 f"Histórico recente ordenado da conversa:\n" + "\n".join(hist_lines) + "\n\n"
-                f"Pessoa ({first_name or 'Nome ainda não informado'}): {user_text}\n"
-                f"Responda como {secretary_name} (curta, calorosa, máx 1 emoji, NUNCA chame de 'Cliente', se não souber o nome pergunte gentilmente como pode chamar, oferecendo opções: {niches_formatted} ou horários: {slots_text}):"
+                f"Pessoa ({first_name or 'Ainda não informado'}): {user_text}\n"
+                f"Responda como {secretary_name} (curta, humana, sem alucinar, qualificando o evento e oferecendo os pacotes reais ou horários: {slots_text}):"
             )
             resp = genai_model.generate_content(full_prompt)
             if resp and resp.text:
@@ -1274,20 +1287,14 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         except Exception as e:
             logger.warning("Gemini generation fallback: %s", e)
 
-    # Fallback contextual inteligente caso Gemini API Key não esteja definida
+    # Fallback contextual da proposta real
     vocativo = f", {first_name}" if first_name else ""
-    if len(user_text.strip().split()) <= 2:
-        reply = (
-            f"Oi{vocativo}! Como posso te ajudar hoje aqui no {studio_name}? "
-            f"Se quiser conhecer nossos ensaios de {niches_formatted} ou ver as datas disponíveis, é só me falar ✨"
-        )
-    else:
-        reply = (
-            f"Oi{vocativo}! Entendi perfeitamente. Aqui no {studio_name} temos ensaios a partir de R$ {price} "
-            f"e nossos próximos horários livres são: {slots_text}. Qual opção fica melhor para você?"
-        )
+    reply = (
+        f"Oi{vocativo}! Aqui no Gustavo Alves Fotografia trabalhamos com os pacotes Essencial (R$ 7.500), "
+        f"Premium com pré-wedding (R$ 8.800) e Black Completo (R$ 11.350). Nossos horários livres mais próximos para conversar são: {slots_text}. "
+        "Qual dessas opções fica melhor para vocês?"
+    )
     return limit_to_one_emoji(reply), None, False, interactive_niche_options
-
 
 def analyze_reengagement_with_gemini(history_text: str) -> tuple[bool, str]:
     """Envia histórico pro Gemini: 'Vale a pena reengajar? Responda SIM ou NAO e motivo'."""
@@ -1443,9 +1450,25 @@ def followup_30h_job(force_check: bool = False):
     return processed_results
 
 
+def cleanup_expired_locks():
+    """Libera slots presos em status='locked' por mais de 5 minutos (300s)."""
+    try:
+        now_ts = time.time()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            "UPDATE slots SET status = 'free', client_wa_id = NULL, client_name = NULL, locked_at = 0 WHERE status = 'locked' AND (? - locked_at) > 300",
+            (now_ts,)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning("Falha ao liberar locks expirados: %s", e)
+
 # Inicializa APScheduler em background (1h)
 scheduler = BackgroundScheduler(timezone=TZ)
 scheduler.add_job(followup_30h_job, "interval", hours=1, id="followup_30h_job", replace_existing=True)
+scheduler.add_job(cleanup_expired_locks, "interval", minutes=5, id="cleanup_locks_job", replace_existing=True)
 try:
     scheduler.start()
 except Exception:
@@ -2653,7 +2676,14 @@ def webhook():
         conn.commit()
         conn.close()
 
-        send_whatsapp_message(studio, wa_id, reply_text, image_url=receipt_url)
+        # Verifica modo de expediente
+        studio_mode = (studio.get("mode") or "NORMAL").upper()
+        if studio_mode == "DND":
+            logger.info("[MODO NÃO PERTURBE ATIVO] Atendimento 24h sem notificar o fotógrafo.")
+            # Responde o cliente mas marca notificação como pendente_amanha
+            send_whatsapp_message(studio, wa_id, reply_text, image_url=receipt_url)
+        else:
+            send_whatsapp_message(studio, wa_id, reply_text, image_url=receipt_url)
         logger.info("[WHATSAPP SENT] Resposta despachada com sucesso para %s", mask_wa_id(wa_id))
         responses.append(
             {
@@ -2671,6 +2701,244 @@ def webhook():
 # LGPD COMPLETO (/lgpd/delete, /lgpd/export/<studio_id>)
 # ==============================================================================
 @app.route("/lgpd/delete", methods=["POST", "DELETE"])
+
+
+# ==============================================================================
+# ENDPOINTS ESPECÍFICOS DE PRODUÇÃO / PROPOSTA GUSTAVO ALVES
+# ==============================================================================
+
+@app.route("/api/teste-secretaria", methods=["POST"])
+def api_teste_secretaria():
+    """
+    Testa a secretária Bruna chamando o Gemini 1.5 Flash com o Prompt Oficial da Proposta Real.
+    Se faltar a chave GEMINI_API_KEY, retorna 500 com mensagem explícita para debug.
+    """
+    token = request.args.get("token") or request.args.get("acesso")
+    data = request.get_json(silent=True) or {}
+    user_msg = data.get("message") or data.get("text") or "Oi! Quero saber sobre os pacotes de casamento"
+
+    # Verificação da GEMINI_API_KEY
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    key_preview = gemini_key[:5] + "..." if gemini_key else "NÃO CONFIGURADA"
+    logger.info("[TESTE-SECRETARIA] GEMINI_API_KEY presente: %s", key_preview)
+
+    if not gemini_key:
+        logger.error("[TESTE-SECRETARIA ERROR] GEMINI_API_KEY não configurada no Render!")
+        return jsonify({
+            "ok": False,
+            "error": "GEMINI_API_KEY não configurada no Render. Configure a variável de ambiente no painel do Render para ativar a inteligência artificial."
+        }), 500
+
+    studio = None
+    if token:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            studio = dict(row)
+    if not studio:
+        studio = get_active_studio()
+
+    ensure_slots_for_studio(studio["id"])
+    free_slots = get_three_free_slots(studio["id"])
+    tipo_contato = data.get("tipo_contato", "cliente")
+    system_prompt = build_system_prompt(studio, free_slots, tipo_contato=tipo_contato)
+
+    # Carrega histórico recente
+    conn = get_db()
+    c = conn.cursor()
+    wa_id = f"teste_studio_{studio.get('id', 'principal')}"
+    c.execute(
+        "SELECT direction, content FROM messages WHERE studio_id = ? AND wa_id = ? ORDER BY id DESC LIMIT 15",
+        (studio["id"], wa_id),
+    )
+    history_rows = list(reversed(c.fetchall()))
+    hist_text = "\n".join([f"{r['direction']}: {r['content']}" for r in history_rows])
+
+    # Salva pergunta do usuário
+    c.execute(
+        "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name) VALUES (?, ?, 'in', ?, ?, 'received', 'Usuário de Teste')",
+        (studio["id"], wa_id, user_msg, now_iso()),
+    )
+    conn.commit()
+
+    resposta_texto = ""
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        full_p = f"{system_prompt}\n\nHistórico: {hist_text}\nCliente: {user_msg}\nSlots livres: {', '.join([s['human'] for s in free_slots])}"
+        resp = model.generate_content(full_p)
+        if resp and resp.text:
+            resposta_texto = resp.text.strip()
+    except Exception as e:
+        logger.error("[TESTE-SECRETARIA GEMINI ERROR] %s", e)
+        conn.close()
+        return jsonify({"ok": False, "error": f"Erro na chamada do Gemini: {str(e)}"}), 500
+
+    # Salva resposta gerada
+    c.execute(
+        "INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name) VALUES (?, ?, 'out', ?, ?, 'sent', 'Bruna')",
+        (studio["id"], wa_id, resposta_texto, now_iso()),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "ok": True,
+        "reply": resposta_texto,
+        "gemini_active": True,
+        "key_preview": key_preview
+    })
+
+
+@app.route("/api/agendar", methods=["POST"])
+def api_agendar():
+    """
+    Reserva real com bloqueio atômico BEGIN IMMEDIATE, anti-duplo UNIQUE(studio_id, start_at)
+    e geração do comprovante oficial Pillow.
+    """
+    cleanup_expired_locks()
+    data = request.get_json(silent=True) or {}
+    slot_id = data.get("slot_id")
+    client_name = data.get("client_name") or "Cliente Agendado"
+    client_wa_id = data.get("client_wa_id") or "5534999990000"
+    niche = data.get("niche") or "Casamento - Pacote Premium"
+
+    studio = get_active_studio(data.get("studio_id"))
+    conn = get_db()
+    c = conn.cursor()
+
+    try:
+        # BEGIN IMMEDIATE para evitar concorrência
+        c.execute("BEGIN IMMEDIATE")
+        now_ts = time.time()
+        c.execute(
+            "UPDATE slots SET status = 'locked', client_wa_id = ?, client_name = ?, locked_at = ? WHERE id = ? AND status IN ('free', 'locked')",
+            (client_wa_id, client_name, now_ts, slot_id)
+        )
+        if c.rowcount == 0:
+            conn.rollback()
+            conn.close()
+            return jsonify({"ok": False, "error": "Horário já foi reservado por outro cliente."}), 409
+
+        # Busca dados do slot
+        c.execute("SELECT * FROM slots WHERE id = ?", (slot_id,))
+        slot_row = c.fetchone()
+        slot = dict(slot_row)
+        slot["human"] = format_slot_human(slot["start_at"])
+
+        # Confirma como booked
+        comprovante_id = uuid.uuid4().hex[:8]
+        png_url = generate_comprovante_png(
+            studio_name=studio.get("studio_name") or "Gustavo Alves Fotografia",
+            photographer_name=studio.get("photographer_name") or "Gustavo Alves",
+            client_name=client_name,
+            slot_human=slot["human"],
+            comprovante_id=comprovante_id,
+            niche=niche
+        )
+        c.execute(
+            "UPDATE slots SET status = 'booked', client_wa_id = ?, client_name = ?, niche = ?, comprovante_id = ?, receipt_path = ?, locked_at = 0 WHERE id = ?",
+            (client_wa_id, client_name, niche, comprovante_id, png_url, slot_id)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({
+            "ok": True,
+            "slot_id": slot_id,
+            "status": "booked",
+            "comprovante_id": comprovante_id,
+            "receipt_path": png_url
+        })
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        conn.close()
+        return jsonify({"ok": False, "error": "Conflito: esse horário já está agendado."}), 409
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/agendamento/<int:slot_id>", methods=["DELETE", "POST"])
+def api_deletar_agendamento(slot_id: int):
+    """Deleta permanentemente ou libera o agendamento no banco SQLite com db.commit()."""
+    token = request.args.get("token") or request.args.get("acesso")
+    studio = None
+    if token:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM studios WHERE dashboard_token = ?", (token,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            studio = dict(row)
+    if not studio:
+        studio = get_active_studio()
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM slots WHERE id = ? AND studio_id = ?", (slot_id, studio["id"]))
+    conn.commit()
+    conn.close()
+    logger.info("[SLOT DELETED] Slot #%d removido com sucesso do banco.", slot_id)
+    return jsonify({"ok": True, "slot_id": slot_id, "deleted": True})
+
+
+@app.route("/api/expediente/modo", methods=["POST"])
+def api_alterar_modo_expediente():
+    """Altera modo do estúdio: NORMAL, DND (Não Perturbe), PAUSED."""
+    data = request.get_json(silent=True) or {}
+    novo_modo = data.get("mode", "NORMAL").upper()
+    studio = get_active_studio(data.get("studio_id"))
+    
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE studios SET mode = ?, status = ? WHERE id = ?", (novo_modo, 'PAUSED' if novo_modo == 'PAUSED' else 'ACTIVE', studio["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "mode": novo_modo})
+
+
+@app.route("/api/expediente/bloquear-data", methods=["POST"])
+def api_bloquear_data():
+    """Bloqueia uma data no calendário de expediente."""
+    data = request.get_json(silent=True) or {}
+    date_str = data.get("date")
+    reason = data.get("reason", "Folga / Evento externo")
+    studio = get_active_studio()
+    if not date_str:
+        return jsonify({"ok": False, "error": "Data obrigatória"}), 400
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("INSERT INTO blocked_dates (studio_id, date_str, reason, created_at) VALUES (?, ?, ?, ?)", (studio["id"], date_str, reason, now_iso()))
+    # Bloqueia slots desse dia
+    c.execute("UPDATE slots SET status = 'blocked' WHERE studio_id = ? AND start_at LIKE ? AND status = 'free'", (studio["id"], f"{date_str}%"))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "date": date_str})
+
+
+@app.route("/api/expediente/bloquear-data/<int:block_id>", methods=["DELETE", "POST"])
+def api_desbloquear_data(block_id: int):
+    """Desbloqueia data previamente bloqueada."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT date_str, studio_id FROM blocked_dates WHERE id = ?", (block_id,))
+    row = c.fetchone()
+    if row:
+        d_str, s_id = row["date_str"], row["studio_id"]
+        c.execute("DELETE FROM blocked_dates WHERE id = ?", (block_id,))
+        c.execute("UPDATE slots SET status = 'free' WHERE studio_id = ? AND start_at LIKE ? AND status = 'blocked'", (s_id, f"{d_str}%"))
+        conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/lgpd/delete/<target_id>", methods=["POST", "DELETE", "GET"])
 def lgpd_delete(target_id: str = None):
     """Apaga todos os dados do estúdio ou cliente (studios, messages, slots, followups, consent_log)."""

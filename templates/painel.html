@@ -400,10 +400,16 @@
         <div style="font-size: 13.5px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <span>Fotógrafo: <strong style="color: #fff;">{{ studio.photographer_name }}</strong></span>
           <span>•</span>
-          {% if studio.status == 'PAUSED' %}
-            <span class="badge-status badge-paused">🛑 BOT DESLIGADO / PAUSADO</span>
+          <span>Secretária: <strong style="color: var(--green);">{{ studio.secretary_name }}</strong></span>
+          <span>•</span>
+          <span>Valores: <strong style="color: #fff;">R$ 7.500 / R$ 8.800 / R$ 11.350</strong></span>
+          <span>•</span>
+          {% if studio.mode == 'DND' %}
+            <span class="badge-status" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #c084fc;">🌙 NÃO PERTURBE (24h Silencioso)</span>
+          {% elif studio.status == 'PAUSED' or studio.mode == 'PAUSED' %}
+            <span class="badge-status badge-paused">🛑 SECRETÁRIA PAUSADA</span>
           {% elif studio.status == 'WAITING_HUMAN' %}
-            <span class="badge-status badge-human">⏸️ AGUARDANDO VOCÊ (MODO HUMANO)</span>
+            <span class="badge-status badge-human">⏸️ MODO HUMANO</span>
           {% else %}
             <span class="badge-status badge-active">
               <span class="pulse-dot"></span>
@@ -678,9 +684,9 @@
                   type="button"
                   class="btn btn-danger"
                   id="btn-cancel-{{ slot.id }}"
-                  onclick="abrirModalCancelar({{ slot.id }}, '{{ slot.client_name or '' }}', '{{ slot.start_at }}')"
+                  onclick="deletarAgendamentoReal({{ slot.id }})"
                 >
-                  ❌ Desmarcar Horário
+                  🗑️ Excluir Permanentemente
                 </button>
               </div>
             </div>
@@ -696,6 +702,124 @@
     </div><!-- Fim paneAgendamentos -->
 
     <!-- ABA 3: MEU ESTÚDIO (PORTFÓLIO E DADOS) -->
+    <!-- ABA PACOTES DO PDF OFICIAL -->
+    <div class="tab-pane" id="panePacotes">
+      <div class="status-bar" style="border: 1px solid var(--border);">
+        <div>
+          <h2 style="font-size: 18px; color: #fff;">💍 Proposta Oficial — Gustavo Alves Fotografia</h2>
+          <p style="font-size: 13.5px; color: var(--muted); margin-top: 2px;">
+            A secretária Bruna apresenta estes 3 pacotes oficiais aos casais e qualifica antes de enviar os valores.
+          </p>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 16px;">
+        <!-- Card Essencial -->
+        <div style="background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3 style="font-size: 18px; color: #fff;">1. Essencial</h3>
+            <span style="font-size: 20px; font-weight: 900; color: var(--green);">R$ 7.500</span>
+          </div>
+          <p style="font-size: 13px; color: var(--muted); margin: 6px 0 14px;">Ideal para cerimônias elegantes com cobertura focada</p>
+          <ul style="font-size: 13.5px; color: #d1d7db; line-height: 1.8; padding-left: 18px;">
+            <li>⏱️ <strong>09 horas</strong> de cobertura completa</li>
+            <li>👥 <strong>2 fotógrafos</strong> dedicados</li>
+            <li>💄 Making of dos noivos incluso</li>
+            <li>📷 <strong>800+ fotos</strong> em altíssima resolução</li>
+            <li>🔒 Galeria online privada (até 60 dias úteis)</li>
+          </ul>
+        </div>
+
+        <!-- Card Premium (Destaque) -->
+        <div style="background: var(--card); border: 2px solid var(--green); border-radius: 14px; padding: 20px; position: relative;">
+          <div style="position: absolute; top: -12px; right: 16px; background: var(--green); color: #111b21; font-weight: 900; font-size: 11px; padding: 3px 10px; border-radius: 20px;">
+            ⭐ MAIS CONTRATADO
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3 style="font-size: 18px; color: #fff;">2. Premium</h3>
+            <span style="font-size: 20px; font-weight: 900; color: var(--green);">R$ 8.800</span>
+          </div>
+          <p style="font-size: 13px; color: var(--muted); margin: 6px 0 14px;">Apenas R$ 1.300 a mais com ensaio pré-casamento completo</p>
+          <ul style="font-size: 13.5px; color: #d1d7db; line-height: 1.8; padding-left: 18px;">
+            <li>⏱️ <strong>10 horas</strong> de cobertura no dia do casamento</li>
+            <li>👥 <strong>2 fotógrafos</strong> experientes</li>
+            <li>📸 <strong>Ensaio Pré-Wedding de 2h INCLUSO</strong></li>
+            <li>📷 <strong>1000+ fotos</strong> com tratamento profissional de cor</li>
+            <li>🔒 Galeria online exclusiva para download e compartilhamento</li>
+          </ul>
+        </div>
+
+        <!-- Card Black -->
+        <div style="background: var(--card); border: 1px solid #c084fc; border-radius: 14px; padding: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <h3 style="font-size: 18px; color: #fff;">3. Black</h3>
+            <span style="font-size: 20px; font-weight: 900; color: #c084fc;">R$ 11.350</span>
+          </div>
+          <p style="font-size: 13px; color: var(--muted); margin: 6px 0 14px;">Experiência cinematográfica e documental definitiva</p>
+          <ul style="font-size: 13.5px; color: #d1d7db; line-height: 1.8; padding-left: 18px;">
+            <li>⏱️ <strong>10 horas</strong> de cobertura de casamento</li>
+            <li>👥 <strong>3 fotógrafos</strong> (1 dedicado exclusivamente à decoração e família)</li>
+            <li>🏛️ <strong>Casamento Civil incluso</strong></li>
+            <li>📸 Ensaio Pré-Wedding de <strong>3 horas</strong></li>
+            <li>📷 <strong>2000+ fotos</strong> + arquivos brutos opcionais</li>
+            <li>🖼️ <strong>Quadro 25x30 + porta-retrato 10x15 inclusos</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Serviços Adicionais e Extras do PDF -->
+      <div style="margin-top: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
+        <h4 style="font-size: 15px; color: #fff; margin-bottom: 12px;">➕ Serviços Opcionais & Personalizações (Página 04 do PDF)</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #d1d7db;">
+          <div>• Ensaio Pré-Wedding Avulso: <strong>R$ 1.500</strong></div>
+          <div>• Casamento Civil Avulso: <strong>R$ 800</strong></div>
+          <div>• Hora Extra no Casamento: <strong>R$ 1.000</strong></div>
+          <div>• Fotógrafo Adicional: <strong>R$ 1.000</strong></div>
+          <div>• Mini-Wedding (Cobertura 3h): <strong>R$ 2.250</strong></div>
+          <div>• Entrega Expressa (15 dias úteis): <strong>R$ 1.500</strong></div>
+          <div>• Álbum Luxo 25x30 (Caixa + 60p): <strong>R$ 4.950</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA MEU EXPEDIENTE -->
+    <div class="tab-pane" id="paneExpediente">
+      <div class="status-bar" style="border: 1px solid var(--border);">
+        <div>
+          <h2 style="font-size: 18px; color: #fff;">⏰ Modo de Expediente e Agendamento 24h</h2>
+          <p style="font-size: 13.5px; color: var(--muted); margin-top: 2px;">
+            Defina como a secretária Bruna deve se comportar durante o dia ou à noite.
+          </p>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+        <div style="background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; text-align: center;">
+          <h3 style="font-size: 16px; color: #fff;">🟢 Normal</h3>
+          <p style="font-size: 13px; color: var(--muted); margin: 8px 0 16px;">A secretária responde e notifica normalmente.</p>
+          <button type="button" class="btn btn-green" style="width: 100%;" onclick="mudarModoExpediente('NORMAL')">
+            Ativar Modo Normal
+          </button>
+        </div>
+
+        <div style="background: var(--card); border: 1px solid #c084fc; border-radius: 14px; padding: 20px; text-align: center;">
+          <h3 style="font-size: 16px; color: #c084fc;">🌙 Não Perturbe (24h Silencioso)</h3>
+          <p style="font-size: 13px; color: var(--muted); margin: 8px 0 16px;">Agenda normalmente de madrugada sem enviar alertas sonoros ou acordar você.</p>
+          <button type="button" class="btn btn-outline" style="width: 100%; border-color: #c084fc; color: #c084fc;" onclick="mudarModoExpediente('DND')">
+            Ativar Não Perturbe
+          </button>
+        </div>
+
+        <div style="background: var(--card); border: 1px solid #ea4335; border-radius: 14px; padding: 20px; text-align: center;">
+          <h3 style="font-size: 16px; color: #ea4335;">🔴 Pausar Secretária</h3>
+          <p style="font-size: 13px; color: var(--muted); margin: 8px 0 16px;">Suspende respostas automáticas para atendimento 100% manual.</p>
+          <button type="button" class="btn btn-outline" style="width: 100%; border-color: #ea4335; color: #ea4335;" onclick="mudarModoExpediente('PAUSED')">
+            Pausar Secretária
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-pane" id="paneStudio">
       <div class="status-bar" style="border: 1px solid var(--border);">
         <div>
@@ -709,16 +833,11 @@
         </a>
       </div>
 
-      <!-- Nichos Dinâmicos e Portfólio -->
+      <!-- Pacotes Dinâmicos e Portfólio -->
       {% set all_display_niches = [
-        ('gestante', '🤰 Ensaio Gestante'),
-        ('newborn', '👶 Ensaio Newborn'),
-        ('familia', '👨‍👩‍👧 Ensaio Família'),
-        ('casamento', '💍 Ensaio Casamento & Pré-Wedding'),
-        ('formatura', '🎓 Ensaio Formatura & Becas'),
-        ('casal', '❤️ Ensaio Casal & Namorados'),
-        ('corporativo', '💼 Retrato Corporativo'),
-        ('15anos', '👑 Ensaio 15 Anos & Debutante')
+        ('portfolio_essencial', '💍 Pacote Essencial (R$ 7.500)'),
+        ('portfolio_premium', '⭐ Pacote Premium (R$ 8.800)'),
+        ('portfolio_black', '🖤 Pacote Black (R$ 11.350)')
       ] %}
 
       {% for n_key, n_title in all_display_niches %}
@@ -912,8 +1031,8 @@
                     📄 Ver Comprovante
                   </a>
                 ` : ''}
-                <button type="button" class="btn btn-outline" style="border-color: #ea4335; color: #ea4335; font-size: 12px; padding: 7px 12px;" onclick="abrirModalCancelar(${slot.id}, '${slot.client_name}', '${slot.start_at}')">
-                  Desmarcar
+                <button type="button" class="btn btn-outline" style="border-color: #ea4335; color: #ea4335; font-size: 12px; padding: 7px 12px;" onclick="deletarAgendamentoReal(${slot.id})">
+                  🗑️ Excluir
                 </button>
               </div>
             </div>
@@ -1162,6 +1281,48 @@
     function fecharModalWaPainel() {
       const m = document.getElementById('modalPainelWa');
       if (m) m.close();
+    }
+
+    async function mudarModoExpediente(novoModo) {
+      try {
+        const resp = await fetch('/api/expediente/modo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studio_id: STUDIO_ID, mode: novoModo })
+        });
+        const data = await resp.json();
+        if (data && data.ok) {
+          mostrarToast('Modo de expediente alterado para ' + novoModo + ' com sucesso!');
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          alert('Erro ao alterar modo: ' + (data.error || 'Tente novamente'));
+        }
+      } catch (e) {
+        alert('Erro de conexão ao alterar modo de expediente.');
+      }
+    }
+
+    async function deletarAgendamentoReal(slotId) {
+      if (!confirm('Tem certeza que deseja excluir permanentemente este agendamento?')) return;
+      try {
+        const resp = await fetch('/api/agendamento/' + slotId + '?token=' + encodeURIComponent(DASHBOARD_CHAVE), {
+          method: 'DELETE'
+        });
+        const data = await resp.json();
+        if (data && data.ok) {
+          mostrarToast('Agendamento excluído com sucesso do banco!');
+          const card = document.getElementById('card-slot-' + slotId);
+          if (card) {
+            card.style.opacity = '0.3';
+            setTimeout(() => card.remove(), 800);
+          }
+          carregarAgendamentosDinamico();
+        } else {
+          alert('Erro ao excluir: ' + (data.error || 'Tente novamente'));
+        }
+      } catch (e) {
+        alert('Erro ao excluir agendamento.');
+      }
     }
   </script>
 </body>
