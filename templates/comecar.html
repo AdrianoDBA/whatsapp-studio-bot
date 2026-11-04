@@ -238,42 +238,60 @@
     </div>
 
     <div class="qr-section">
-      <h2 style="font-size: 16px; color: #fff;">📱 Abrir no Celular ou Colar no Estúdio</h2>
-      <p style="font-size: 13.5px; color: var(--muted);">
-        Escaneie o código abaixo para abrir esta página instantaneamente no celular:
+      <h2 style="font-size: 18px; color: #fff;" id="sectionQrTitle">📲 Conectar seu WhatsApp via QR Code</h2>
+      <p style="font-size: 13.5px; color: var(--muted);" id="sectionQrSubtitle">
+        Abra o WhatsApp no celular > <strong>Aparelhos conectados</strong> > <strong>Conectar um aparelho</strong> e aponte para o código:
       </p>
-      <div class="qr-box">
-        <img src="/static/qr-comecar.png" alt="QR Code para começar" />
+      
+      <div class="qr-box" id="mainQrContainer" style="background: #fff; padding: 14px; border-radius: 14px; display: inline-block; min-width: 240px; min-height: 240px; margin: 12px auto;">
+        <div id="mainQrLoading" style="color: #111b21; font-weight: 700; padding: 80px 10px; font-size: 14px;">
+          ⏳ Gerando QR Code do WhatsApp...
+        </div>
+        <img id="mainQrImage" src="" alt="QR Code WhatsApp" style="width: 220px; height: 220px; display: none; margin: 0 auto;" />
+        <div id="mainQrSuccess" style="display: none; padding: 50px 10px; color: #111b21;">
+          <div style="font-size: 42px;">✅</div>
+          <strong style="font-size: 16px; display: block; margin-top: 8px; color: #075e54;">WhatsApp Conectado!</strong>
+          <span id="mainQrPhone" style="font-size: 13px; color: #555; display: block; margin-top: 4px;"></span>
+        </div>
       </div>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px;">
-        <a href="{{ dashboard_url }}" style="background: var(--panel); color: #fff; text-decoration: none; padding: 10px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--border);">
-          💻 Abrir Painel no Computador
-        </a>
-        <a href="/instalar" style="background: var(--panel); color: var(--green); text-decoration: none; padding: 10px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--green);">
-          📱 Instalar Aplicativo no Celular
+
+      <div id="mainActionButtons" style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px;">
+        <button type="button" class="btn-connect" onclick="abrirConexaoDireta()" style="padding: 12px 20px; font-size: 14px; margin: 0;">
+          📲 Abrir QR Code em Tela Cheia
+        </button>
+        <button type="button" onclick="gerarNovoQrWhatsApp()" style="background: var(--panel); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--border); cursor: pointer;">
+          🔄 Gerar Novo QR Code
+        </button>
+        <a href="{{ dashboard_url }}" id="mainBtnPainel" style="display: none; background: #25D366; color: #111b21; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 900;">
+          📋 Acessar Painel da Secretária →
         </a>
       </div>
     </div>
   </main>
 
   <dialog id="modalConexao">
-    <h3 id="modalTitle" style="color: #25D366; font-size: 20px; margin-bottom: 10px;">📲 Conectar seu WhatsApp</h3>
+    <h3 id="modalTitle" style="color: #25D366; font-size: 20px; margin-bottom: 10px;">📲 Escaneie o QR Code no seu Celular</h3>
     <p style="font-size: 14.5px; color: #d1d7db; margin-bottom: 14px; line-height: 1.45;" id="modalStatusText">
-      Verificando conexão do seu WhatsApp e ativando sua secretária virtual...
+      Abra o WhatsApp no seu celular > <strong>Aparelhos conectados</strong> > <strong>Conectar um aparelho</strong> e aponte para a tela:
     </p>
-    <div id="qrGatewayBox" style="display: none; margin: 12px auto; background: #fff; padding: 14px; border-radius: 14px; width: fit-content;">
-      <img id="qrGatewayImg" src="" alt="QR WhatsApp" style="width: 220px; height: 220px; display: block;" />
+    <div id="qrGatewayBox" style="display: block; margin: 12px auto; background: #fff; padding: 14px; border-radius: 14px; width: fit-content;">
+      <div id="modalQrLoading" style="color: #111b21; font-weight: 700; padding: 60px 20px; font-size: 13.5px;">
+        ⏳ Carregando QR Code do WhatsApp...
+      </div>
+      <img id="qrGatewayImg" src="" alt="QR WhatsApp" style="width: 240px; height: 240px; display: none;" />
+      <div id="modalQrSuccess" style="display: none; padding: 40px 10px; color: #111b21;">
+        <div style="font-size: 48px;">✅</div>
+        <strong style="font-size: 17px; display: block; margin-top: 8px; color: #075e54;">WhatsApp Conectado com Sucesso!</strong>
+        <span id="modalQrPhone" style="font-size: 13.5px; color: #555; display: block; margin-top: 4px;"></span>
+      </div>
     </div>
     <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
-      <a href="{{ dashboard_url }}" id="btnGoPainel" style="background: #25D366; color: #111b21; text-decoration: none; padding: 14px; border-radius: 10px; font-weight: 900; font-size: 15.5px;">
+      <a href="{{ dashboard_url }}" id="btnGoPainel" style="display: none; background: #25D366; color: #111b21; text-decoration: none; padding: 14px; border-radius: 10px; font-weight: 900; font-size: 15.5px;">
         📋 Abrir Painel de Controle Agora →
       </a>
       <button type="button" id="btnTrocarQr" onclick="gerarNovoQrWhatsApp()" style="background: var(--panel); color: #fff; border: 1px solid var(--green); padding: 12px; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: pointer;">
         🔄 Conectar Outro Celular / Gerar Novo QR Code
       </button>
-      <a href="/onboarding?studio_id={{ studio.id }}" style="background: var(--panel); color: var(--muted); text-decoration: none; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 13px; border: 1px solid var(--border);">
-        ⚙️ Editar Nome e Preços do Estúdio
-      </a>
       <button type="button" onclick="fecharModalConexao()" style="background: transparent; color: var(--muted); border: none; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 13px;">
         Fechar janela
       </button>
@@ -287,20 +305,29 @@
   <script>
     const ROTA_CONEXAO_OFICIAL = '{{ rota_conexao }}';
     const STUDIO_ID = '{{ studio.id }}';
+    const DASHBOARD_URL = '{{ dashboard_url }}';
     let qrPollTimer = null;
+    let isConnectedGlobal = false;
 
     function fecharModalConexao() {
-      if (qrPollTimer) clearInterval(qrPollTimer);
-      document.getElementById('modalConexao').close();
-      const btn = document.getElementById('btnConnect');
-      if (btn) btn.textContent = 'CONECTAR MEU WHATSAPP →';
+      const modal = document.getElementById('modalConexao');
+      if (modal) modal.close();
+      if (!isConnectedGlobal) {
+        const btn = document.getElementById('btnConnect');
+        if (btn) btn.textContent = 'CONECTAR MEU WHATSAPP →';
+      }
     }
 
     async function iniciarConexaoUmClique() {
-      const btn = document.getElementById('btnConnect');
-      btn.textContent = 'ATIVANDO SUA SECRETÁRIA...';
+      if (isConnectedGlobal) {
+        window.location.href = DASHBOARD_URL;
+        return;
+      }
 
-      // Liga o bot imediatamente em 1 clique
+      const btn = document.getElementById('btnConnect');
+      if (btn) btn.textContent = 'CONECTANDO SEU WHATSAPP...';
+
+      // Ativa o bot
       try {
         await fetch('/bot/ativar', {
           method: 'POST',
@@ -309,7 +336,7 @@
         });
       } catch (e) {}
 
-      // Tenta fluxo oficial do Facebook se disponível e ativo
+      // Tenta fluxo oficial se disponível
       if (window.ENABLE_FB_LOGIN && window.FB && typeof window.FB.login === 'function') {
         try {
           window.FB.login(function(response) {
@@ -331,56 +358,143 @@
     }
 
     async function atualizarEstadoModal() {
+      // Modal elements
       const modal = document.getElementById('modalConexao');
       const title = document.getElementById('modalTitle');
-      const qrBox = document.getElementById('qrGatewayBox');
+      const modalLoading = document.getElementById('modalQrLoading');
       const qrImg = document.getElementById('qrGatewayImg');
+      const modalSuccess = document.getElementById('modalQrSuccess');
+      const modalPhone = document.getElementById('modalQrPhone');
       const statusTxt = document.getElementById('modalStatusText');
-      const btn = document.getElementById('btnConnect');
+      const btnGoPainel = document.getElementById('btnGoPainel');
+      
+      // Inline elements
+      const mainLoading = document.getElementById('mainQrLoading');
+      const mainImg = document.getElementById('mainQrImage');
+      const mainSuccess = document.getElementById('mainQrSuccess');
+      const mainPhone = document.getElementById('mainQrPhone');
+      const mainBtnPainel = document.getElementById('mainBtnPainel');
+      const sectionTitle = document.getElementById('sectionQrTitle');
+      const sectionSubtitle = document.getElementById('sectionQrSubtitle');
+      const btnConnect = document.getElementById('btnConnect');
 
       try {
         const res = await fetch('/status-conexao?auto_start=1');
         const data = await res.json();
+
         if (data && data.status === 'CONNECTED') {
+          isConnectedGlobal = true;
           const num = data.connectedNumber ? ('+' + data.connectedNumber) : 'Seu WhatsApp';
-          title.textContent = '✅ WhatsApp Conectado e Ativo!';
-          statusTxt.innerHTML = 'Seu número <strong>' + num + '</strong> já está conectado e sua secretária virtual está respondendo os clientes automaticamente!';
-          qrBox.style.display = 'none';
-          if (btn) btn.textContent = '✅ WHATSAPP CONECTADO (' + num + ')';
+
+          // Modal updates
+          if (title) title.textContent = '✅ WhatsApp Conectado com Sucesso!';
+          if (statusTxt) statusTxt.innerHTML = 'Seu número <strong>' + num + '</strong> está conectado e sua secretária virtual já está ativa!';
+          if (modalLoading) modalLoading.style.display = 'none';
+          if (qrImg) qrImg.style.display = 'none';
+          if (modalSuccess) modalSuccess.style.display = 'block';
+          if (modalPhone) modalPhone.textContent = num;
+          if (btnGoPainel) btnGoPainel.style.display = 'block';
+
+          // Inline updates
+          if (mainLoading) mainLoading.style.display = 'none';
+          if (mainImg) mainImg.style.display = 'none';
+          if (mainSuccess) mainSuccess.style.display = 'block';
+          if (mainPhone) mainPhone.textContent = num;
+          if (mainBtnPainel) mainBtnPainel.style.display = 'inline-block';
+          if (sectionTitle) sectionTitle.textContent = '✅ WhatsApp Conectado!';
+          if (sectionSubtitle) sectionSubtitle.textContent = 'Seu aparelho está pareado com sucesso. Acesse o painel pelo botão abaixo:';
+          if (btnConnect) {
+            btnConnect.textContent = '✅ WHATSAPP CONECTADO - ABRIR PAINEL →';
+            btnConnect.onclick = () => { window.location.href = DASHBOARD_URL; };
+          }
           return;
         }
+
+        isConnectedGlobal = false;
+        if (btnGoPainel) btnGoPainel.style.display = 'none';
+        if (mainBtnPainel) mainBtnPainel.style.display = 'none';
+
         if (data && data.qr) {
-          title.textContent = '📲 Escaneie o QR Code no seu WhatsApp';
-          statusTxt.textContent = 'No seu celular, abra o WhatsApp > Aparelhos Conectados > Conectar um Aparelho e aponte a câmera:';
-          qrImg.src = data.qr;
-          qrBox.style.display = 'block';
+          // Modal QR active
+          if (title) title.textContent = '📲 Escaneie o QR Code no seu Celular';
+          if (statusTxt) statusTxt.innerHTML = 'Abra o WhatsApp no celular > <strong>Aparelhos conectados</strong> > <strong>Conectar um aparelho</strong> e aponte para a tela:';
+          if (modalLoading) modalLoading.style.display = 'none';
+          if (modalSuccess) modalSuccess.style.display = 'none';
+          if (qrImg) {
+            qrImg.src = data.qr;
+            qrImg.style.display = 'block';
+          }
+
+          // Inline QR active
+          if (mainLoading) mainLoading.style.display = 'none';
+          if (mainSuccess) mainSuccess.style.display = 'none';
+          if (mainImg) {
+            mainImg.src = data.qr;
+            mainImg.style.display = 'block';
+          }
+          if (sectionTitle) sectionTitle.textContent = '📲 Conectar seu WhatsApp via QR Code';
+          if (sectionSubtitle) sectionSubtitle.innerHTML = 'Abra o WhatsApp no celular > <strong>Aparelhos conectados</strong> > <strong>Conectar um aparelho</strong> e aponte para o código:';
+          if (btnConnect) {
+            btnConnect.textContent = 'CONECTAR MEU WHATSAPP (ABRIR QR) →';
+            btnConnect.onclick = abrirConexaoDireta;
+          }
           return;
         }
-        title.textContent = '⏳ Gerando QR Code do WhatsApp...';
-        statusTxt.textContent = 'Aguarde alguns segundos enquanto preparamos a leitura do seu celular...';
+
+        // Warming up or waiting
+        if (modalLoading) modalLoading.style.display = 'block';
+        if (qrImg) qrImg.style.display = 'none';
+        if (modalSuccess) modalSuccess.style.display = 'none';
+        if (mainLoading) mainLoading.style.display = 'block';
+        if (mainImg) mainImg.style.display = 'none';
+        if (mainSuccess) mainSuccess.style.display = 'none';
+        if (title) title.textContent = '⏳ Gerando QR Code do WhatsApp...';
+        if (statusTxt) statusTxt.textContent = 'Aguarde alguns segundos enquanto preparamos a conexão do seu WhatsApp...';
+        if (btnConnect) {
+          btnConnect.textContent = 'CONECTAR MEU WHATSAPP →';
+          btnConnect.onclick = iniciarConexaoUmClique;
+        }
       } catch (e) {}
     }
 
     async function abrirConexaoDireta() {
       const modal = document.getElementById('modalConexao');
-      if (!modal.open) modal.showModal();
+      if (modal && !modal.open) modal.showModal();
       await atualizarEstadoModal();
-      if (qrPollTimer) clearInterval(qrPollTimer);
-      qrPollTimer = setInterval(atualizarEstadoModal, 2500);
     }
 
     async function gerarNovoQrWhatsApp() {
       const title = document.getElementById('modalTitle');
       const statusTxt = document.getElementById('modalStatusText');
-      const qrBox = document.getElementById('qrGatewayBox');
-      title.textContent = '🔄 Preparando Novo QR Code...';
-      statusTxt.textContent = 'Desconectando sessão anterior e gerando um novo QR Code para você escanear...';
-      qrBox.style.display = 'none';
+      const modalLoading = document.getElementById('modalQrLoading');
+      const qrImg = document.getElementById('qrGatewayImg');
+      const modalSuccess = document.getElementById('modalQrSuccess');
+      const mainLoading = document.getElementById('mainQrLoading');
+      const mainImg = document.getElementById('mainQrImage');
+      const mainSuccess = document.getElementById('mainQrSuccess');
+
+      if (title) title.textContent = '🔄 Preparando Novo QR Code...';
+      if (statusTxt) statusTxt.textContent = 'Desconectando sessão anterior e gerando um novo QR Code para você escanear...';
+      if (modalLoading) modalLoading.style.display = 'block';
+      if (qrImg) qrImg.style.display = 'none';
+      if (modalSuccess) modalSuccess.style.display = 'none';
+      if (mainLoading) mainLoading.style.display = 'block';
+      if (mainImg) mainImg.style.display = 'none';
+      if (mainSuccess) mainSuccess.style.display = 'none';
+
       try {
         await fetch('/desconectar-whatsapp', { method: 'POST' });
       } catch (e) {}
-      setTimeout(atualizarEstadoModal, 1800);
+      setTimeout(atualizarEstadoModal, 1500);
     }
+
+    // Auto-poll on load
+    window.addEventListener('DOMContentLoaded', () => {
+      atualizarEstadoModal();
+      if (!qrPollTimer) {
+        qrPollTimer = setInterval(atualizarEstadoModal, 2500);
+      }
+    });
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

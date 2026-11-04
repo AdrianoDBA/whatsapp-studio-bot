@@ -3257,7 +3257,7 @@ def status_conexao():
             return jsonify(r.json()), 200
     except Exception:
         pass
-    return jsonify({"status": "READY_ONE_CLICK", "qr": None, "connectedNumber": None}), 200
+    return jsonify({"status": "CONNECTING_GATEWAY", "qr": None, "connectedNumber": None}), 200
 
 
 @app.route("/desconectar-whatsapp", methods=["POST"])

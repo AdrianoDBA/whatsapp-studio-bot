@@ -190,8 +190,16 @@ def get_whatsapp_provider(studio: Optional[Dict[str, Any]] = None) -> WhatsAppPr
         if studio.get("phone_number_id"):
             phone_number_id = studio.get("phone_number_id")
 
-    if use_provider in ("meta", "cloud") or (token and phone_number_id):
+    is_real_cloud = bool(
+        token
+        and not str(token).startswith("COLA_")
+        and not str(token).startswith("meta_cloud_token_placeholder")
+        and phone_number_id
+        and not str(phone_number_id).startswith("COLA_")
+    )
+
+    if (use_provider in ("meta", "cloud") and is_real_cloud) or (token and phone_number_id and is_real_cloud):
         return CloudApiProvider(phone_number_id=phone_number_id, token=token)
 
-    # Se nenhuma variável da Cloud API existir e USE_PROVIDER não for meta, usa BaileysProvider
+    # Se nenhuma variável real da Cloud API existir ou se for Baileys/QR, usa BaileysProvider
     return BaileysProvider()
