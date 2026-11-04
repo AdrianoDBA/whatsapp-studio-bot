@@ -2880,12 +2880,6 @@ def webhook():
 
 
 # ==============================================================================
-# LGPD COMPLETO (/lgpd/delete, /lgpd/export/<studio_id>)
-# ==============================================================================
-@app.route("/lgpd/delete", methods=["POST", "DELETE"])
-
-
-# ==============================================================================
 # ENDPOINTS ESPECÍFICOS DE PRODUÇÃO / PROPOSTA GUSTAVO ALVES
 # ==============================================================================
 
@@ -3184,6 +3178,7 @@ def api_desbloquear_data(block_id: int):
     return jsonify({"ok": True})
 
 
+@app.route("/lgpd/delete", methods=["POST", "DELETE", "GET"])
 @app.route("/lgpd/delete/<target_id>", methods=["POST", "DELETE", "GET"])
 def lgpd_delete(target_id: str = None):
     """Apaga todos os dados do estúdio ou cliente (studios, messages, slots, followups, consent_log)."""

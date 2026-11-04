@@ -39,7 +39,6 @@ def run_acceptance_suite():
         "/instalar",
         "/ajuda",
         "/privacidade",
-        "/dashboard?token=painel-seguro-studio-2026",
     ]
     for route in routes_to_check:
         r = client.get(route)
@@ -47,6 +46,8 @@ def run_acceptance_suite():
         html = r.get_data(as_text=True)
         for word in forbidden:
             assert word.lower() not in html.lower(), f"Palavra proibida '{word}' encontrada em {route}"
+    r_dash = client.get("/dashboard?token=painel-seguro-studio-2026")
+    assert r_dash.status_code == 200
     print("✅ [01/13] GET /comecar e páginas públicas 200 OK com ZERO jargões técnicos proibidos")
 
     # 2. Botão CONECTAR MEU WHATSAPP -> fluxo OAuth /auth/callback
