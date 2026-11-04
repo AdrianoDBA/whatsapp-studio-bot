@@ -71,7 +71,9 @@ def resolve_db_path() -> str:
 
 DB_PATH = resolve_db_path()
 PORT = int(os.getenv("PORT", 5005))
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://whatsapp-studio-bot.antigravity.app")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
+if not PUBLIC_BASE_URL or "antigravity.app" in PUBLIC_BASE_URL:
+    PUBLIC_BASE_URL = os.getenv("RENDER_EXTERNAL_URL", "https://whatsapp-studio-bot.onrender.com")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://127.0.0.1:5006")
 
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "studio_verify_token_2026")
