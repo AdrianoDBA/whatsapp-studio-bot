@@ -51,9 +51,25 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 COMPROVANTES_DIR = os.path.join(STATIC_DIR, "comprovantes")
 os.makedirs(COMPROVANTES_DIR, exist_ok=True)
 
-DB_PATH = os.getenv(
-    "DB_PATH", "/data/studio.db" if os.path.exists("/data") else os.path.join(BASE_DIR, "studio.db")
-)
+def resolve_db_path() -> str:
+    candidate = os.getenv("DB_PATH", "/data/studio.db")
+    db_dir = os.path.dirname(candidate)
+    if db_dir:
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            test_file = os.path.join(db_dir, ".write_test")
+            with open(test_file, "w") as f:
+                f.write("ok")
+            if os.path.exists(test_file):
+                os.remove(test_file)
+            return candidate
+        except (OSError, PermissionError):
+            fallback_dir = os.path.join(BASE_DIR, "data")
+            os.makedirs(fallback_dir, exist_ok=True)
+            return os.path.join(fallback_dir, os.path.basename(candidate))
+    return candidate
+
+DB_PATH = resolve_db_path()
 PORT = int(os.getenv("PORT", 5005))
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://whatsapp-studio-bot.antigravity.app")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://127.0.0.1:5006")
@@ -177,7 +193,10 @@ def clean_input(val: str, max_len: int = 80) -> str:
 def get_db():
     db_dir = os.path.dirname(DB_PATH)
     if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except Exception:
+            pass
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     return conn
@@ -1454,10 +1473,74 @@ def cleanup_expired_locks():
     except Exception as e:
         logger.warning("Falha ao liberar locks expirados: %s", e)
 
+
+def avaliacao_pos_evento_job():
+    """
+    Envia pedido de avaliação 1 dia após a realização do evento/ensaio:
+    'Amou as fotos? Deixa uma avaliação no Google e no Instagram @gustavoalvsfotografia!'
+    com links configurados no estúdio (google_review_url e instagram_url).
+    """
+    try:
+        now = datetime.now(TZ)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            SELECT s.id, s.studio_id, s.client_wa_id, s.client_name, s.start_at,
+                   st.studio_name, st.google_review_url, st.instagram_url, st.secretary_name
+            FROM slots s
+            JOIN studios st ON s.studio_id = st.id
+            WHERE s.status = 'booked'
+              AND s.client_wa_id IS NOT NULL
+              AND s.client_wa_id != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM messages m
+                  WHERE m.studio_id = s.studio_id
+                    AND m.wa_id = s.client_wa_id
+                    AND m.status = 'avaliacao_sent'
+              )
+        """)
+        rows = c.fetchall()
+        for row in rows:
+            try:
+                start_dt = datetime.fromisoformat(row["start_at"])
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=TZ)
+                diff_hours = (now - start_dt).total_seconds() / 3600.0
+                if 20.0 <= diff_hours <= 48.0:
+                    wa_id = row["client_wa_id"]
+                    studio_id = row["studio_id"]
+                    client_name = (row["client_name"] or "Cliente").split()[0]
+                    secretary_name = row["secretary_name"] or "Bruna"
+                    google_url = row["google_review_url"] or "https://g.page/r/gustavoalvsfotografia/review"
+                    insta_url = row["instagram_url"] or "https://instagram.com/gustavoalvsfotografia"
+
+                    msg = (
+                        f"Oi {client_name}! Aqui é a {secretary_name} do Gustavo Alves Fotografia. "
+                        f"Amou as fotos? Ficaremos honrados com sua avaliação no Google: {google_url} "
+                        f"e marque nosso perfil oficial no Instagram @gustavoalvsfotografia ({insta_url})! 📸💚"
+                    )
+
+                    studio_dict = {"id": studio_id, "studio_name": row["studio_name"] or "Gustavo Alves Fotografia"}
+                    send_whatsapp_message(studio_dict, wa_id, msg)
+
+                    c.execute("""
+                        INSERT INTO messages (studio_id, wa_id, direction, content, timestamp, status, client_name)
+                        VALUES (?, ?, 'out', ?, ?, 'avaliacao_sent', ?)
+                    """, (studio_id, wa_id, msg, now.isoformat(), row["client_name"]))
+                    conn.commit()
+                    logger.info("[AVALIAÇÃO JOB] Mensagem de avaliação pós-evento enviada para %s", wa_id)
+            except Exception as item_err:
+                logger.warning("[AVALIAÇÃO JOB] Erro ao verificar slot #%s: %s", row["id"], item_err)
+        conn.close()
+    except Exception as e:
+        logger.warning("[AVALIAÇÃO JOB] Falha geral: %s", e)
+
+
 # Inicializa APScheduler em background (1h)
 scheduler = BackgroundScheduler(timezone=TZ)
 scheduler.add_job(followup_30h_job, "interval", hours=1, id="followup_30h_job", replace_existing=True)
 scheduler.add_job(cleanup_expired_locks, "interval", minutes=5, id="cleanup_locks_job", replace_existing=True)
+scheduler.add_job(avaliacao_pos_evento_job, "interval", hours=1, id="avaliacao_pos_evento_job", replace_existing=True)
 try:
     scheduler.start()
 except Exception:
@@ -2096,6 +2179,13 @@ def page_dashboard():
     for ie in ig_recent_events:
         ie["formatted_time"] = datetime.fromtimestamp(ie["timestamp"]).strftime("%d/%m %H:%M") if ie.get("timestamp") else ""
 
+    # Lista de contatos classificados (cliente, amigo, familia, fornecedor)
+    c.execute(
+        "SELECT id, studio_id, phone, name, tipo, created_at FROM contacts WHERE studio_id = ? ORDER BY id DESC LIMIT 50",
+        (studio_id,),
+    )
+    contacts_list = [dict(r) for r in c.fetchall()]
+
     # Prepara fotos por nicho para a aba 'Meu Estúdio' dentro do painel com fallback demo
     photos_by_niche = ensure_demo_photos({})
     try:
@@ -2128,6 +2218,7 @@ def page_dashboard():
         booked_slots=booked_slots,
         free_slots=free_slots,
         photos_by_niche=photos_by_niche,
+        contacts=contacts_list,
         recent_messages=conversations,
         ig_comments=ig_comments,
         ig_waiting=ig_waiting,
@@ -2333,6 +2424,25 @@ def _dashboard_simular_conversa_impl():
     user_text = clean_input(data.get("text") or "Oi! Quero saber os horários de ensaio", 400)
     wa_id = f"teste_studio_{studio.get('id', 'principal')}"
 
+    # Suporte a tipo_contato na simulação (cliente, amigo, familia, fornecedor)
+    tipo_contato_req = (data.get("tipo_contato") or "").strip().lower()
+    if tipo_contato_req in ["cliente", "amigo", "familia", "família", "fornecedor"]:
+        try:
+            conn_temp = get_db()
+            c_temp = conn_temp.cursor()
+            c_temp.execute(
+                """
+                INSERT INTO contacts (studio_id, phone, name, tipo, created_at)
+                VALUES (?, ?, 'Usuário Teste', ?, ?)
+                ON CONFLICT(studio_id, phone) DO UPDATE SET tipo = excluded.tipo
+                """,
+                (studio["id"], wa_id, tipo_contato_req, now_iso())
+            )
+            conn_temp.commit()
+            conn_temp.close()
+        except Exception:
+            pass
+
     # Recupera nome gravado nas mensagens anteriores se houver (com fallback resiliente se a coluna não existir)
     conn = get_db()
     c = conn.cursor()
@@ -2518,7 +2628,7 @@ def webhook():
         if not verify_hmac_signature(raw_body, sig_header):
             logger.warning("WEBHOOK_REJECTED: invalid X-Hub-Signature-256")
             return jsonify({"error": "Invalid HMAC signature"}), 403
-    elif use_provider != "meta":
+    elif use_provider not in ("meta", "cloud"):
         # Se não enviou assinatura e não está configurado explicitamente para bypass em desenvolvimento
         candidate_secret = os.getenv("WHATSAPP_APP_SECRET") or os.getenv("APP_SECRET")
         if candidate_secret and candidate_secret not in ("studio_secret_hmac_2026", "studio_bot_app_secret_2026"):
@@ -2973,6 +3083,69 @@ def api_alterar_modo_expediente():
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "mode": novo_modo})
+
+
+@app.route("/api/contacts/upsert", methods=["POST"])
+def api_contacts_upsert():
+    """
+    Cadastra ou atualiza um contato (tipo: cliente, amigo, familia, fornecedor).
+    Faz UPSERT no SQLite.
+    """
+    data = request.get_json(silent=True) or request.form or {}
+    studio = get_active_studio(data.get("studio_id"))
+    phone = (data.get("phone") or data.get("wa_id") or "").strip()
+    name = (data.get("name") or data.get("client_name") or "").strip()
+    tipo = (data.get("tipo") or "cliente").strip().lower()
+
+    if not phone:
+        return jsonify({"ok": False, "error": "Telefone / WhatsApp é obrigatório."}), 400
+
+    phone_clean = re.sub(r"\D", "", phone)
+    if not phone_clean:
+        phone_clean = phone
+
+    if tipo not in ["cliente", "amigo", "familia", "família", "fornecedor"]:
+        tipo = "cliente"
+
+    conn = get_db()
+    c = conn.cursor()
+    now_str = now_iso()
+    try:
+        c.execute("""
+            INSERT INTO contacts (studio_id, phone, name, tipo, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(studio_id, phone) DO UPDATE SET
+                tipo = excluded.tipo,
+                name = CASE WHEN excluded.name != '' THEN excluded.name ELSE contacts.name END
+        """, (studio["id"], phone_clean, name, tipo, now_str))
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    conn.close()
+    logger.info("[CONTACTS UPSERT] Contato %s atualizado para tipo '%s'", phone_clean, tipo)
+    return jsonify({
+        "ok": True,
+        "studio_id": studio["id"],
+        "phone": phone_clean,
+        "name": name,
+        "tipo": tipo
+    })
+
+
+@app.route("/api/contacts", methods=["GET"])
+def api_contacts_list():
+    studio = get_active_studio(request.args.get("studio_id"))
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, studio_id, phone, name, tipo, created_at FROM contacts WHERE studio_id = ? ORDER BY id DESC LIMIT 50",
+        (studio["id"],),
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify({"ok": True, "contacts": rows})
 
 
 @app.route("/api/expediente/bloquear-data", methods=["POST"])

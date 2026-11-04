@@ -177,6 +177,8 @@
     .btn-outline:hover { border-color: var(--green); }
     .btn-danger { background: rgba(234, 67, 53, 0.15); color: #ff8a80; border: 1px solid var(--danger); }
     .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #c084fc; }
+    .btn-purple:hover { background: #9333ea; color: #fff; }
 
     /* Pílulas interativas do Chat */
     .chat-pill-btn {
@@ -395,7 +397,7 @@
     <div class="status-bar" id="statusBar">
       <div>
         <h1 style="font-size: 20px; font-weight: 800; color: #fff;">
-          {{ studio.studio_name }}
+          Gustavo Alves Fotografia | Bruna | 7.500/8.800/11.350
         </h1>
         <div style="font-size: 13.5px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <span>Fotógrafo: <strong style="color: #fff;">{{ studio.photographer_name }}</strong></span>
@@ -419,23 +421,23 @@
         </div>
       </div>
 
-      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-        {% if studio.status in ['PAUSED', 'WAITING_HUMAN'] %}
-          <button type="button" class="btn btn-green" onclick="alternarStatusSecretaria('ACTIVE')">
-            ▶️ LIGAR SECRETÁRIA
-          </button>
-        {% else %}
-          <button type="button" class="btn btn-outline" style="border-color: #ea4335; color: #ea4335;" onclick="alternarStatusSecretaria('PAUSED')">
-            🛑 DESLIGAR / PAUSAR BOT
-          </button>
-        {% endif %}
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button type="button" class="btn {% if studio.mode == 'NORMAL' or not studio.mode %}btn-green{% else %}btn-outline{% endif %}" onclick="mudarModoExpediente('NORMAL')" title="Atendimento normal">
+          🟢 Normal
+        </button>
+        <button type="button" class="btn {% if studio.mode == 'DND' %}btn-purple{% else %}btn-outline{% endif %}" style="{% if studio.mode != 'DND' %}border-color: #c084fc; color: #c084fc;{% endif %}" onclick="mudarModoExpediente('DND')" title="Não Perturbe - agendando silencioso 24h sem notificar">
+          🌙 Não Perturbe (24h)
+        </button>
+        <button type="button" class="btn {% if studio.mode == 'PAUSED' or studio.status == 'PAUSED' %}btn-danger{% else %}btn-outline{% endif %}" style="{% if studio.mode != 'PAUSED' and studio.status != 'PAUSED' %}border-color: #ea4335; color: #ea4335;{% endif %}" onclick="mudarModoExpediente('PAUSED')" title="Pausada">
+          🔴 Pausada
+        </button>
         <button type="button" class="btn btn-outline" style="border-color: var(--green); color: var(--green);" onclick="abrirModalWhatsAppPainel()">
           📲 Meu WhatsApp / QR Code
         </button>
       </div>
     </div>
 
-    <!-- Navegação em 3 Abas Principais (SPA Sem Reload) -->
+    <!-- Navegação em Abas Principais (SPA Sem Reload) -->
     <div class="tab-nav">
       <button type="button" class="tab-btn active-tab" id="tabBtnConversas" onclick="mudarAba('conversas')">
         💬 Conversas ao Vivo
@@ -447,6 +449,9 @@
             {{ booked_slots|length }}
           </span>
         {% endif %}
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnPacotes" onclick="mudarAba('pacotes')">
+        💍 Pacotes Oficiais (PDF)
       </button>
       <button type="button" class="tab-btn" id="tabBtnStudio" onclick="mudarAba('studio')">
         📸 Meu Estúdio
@@ -495,6 +500,15 @@
             </button>
           </div>
 
+          <!-- Perfil do Contato no Teste -->
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap;">
+            <span>Testar como:</span>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="simTipoContato" value="cliente" checked onchange="trocarTipoContatoTeste('cliente')"> 👤 Cliente</label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="simTipoContato" value="amigo" onchange="trocarTipoContatoTeste('amigo')"> 🤝 Amigo</label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="simTipoContato" value="familia" onchange="trocarTipoContatoTeste('familia')"> 👨‍👩‍👧 Família</label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 3px;"><input type="radio" name="simTipoContato" value="fornecedor" onchange="trocarTipoContatoTeste('fornecedor')"> 📦 Fornecedor</label>
+          </div>
+
           <!-- Formulário de Envio -->
           <form onsubmit="return enviarMensagemChat(event)" style="display: flex; gap: 8px;">
             <input
@@ -509,7 +523,7 @@
           <!-- Atalhos Rápidos -->
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
             <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Bom dia!')">☀️ Bom dia</button>
-            <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero ver fotos de gestante')">🤰 Gestante</button>
+            <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero saber sobre os pacotes de casamento')">💍 Pacotes</button>
             <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero agendar o primeiro horário')">📅 Agendar</button>
             <button type="button" class="btn btn-outline" style="font-size: 11.5px; padding: 6px 10px;" onclick="enviarAtalho('Quero falar com o fotógrafo')">🙋‍♂️ Humano</button>
           </div>
@@ -578,6 +592,13 @@
                     ✅ Retomar IA
                   </button>
                 </div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border);">
+                  <span style="font-size: 11px; color: var(--muted); align-self: center;">Marcar como:</span>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 2px 6px;" onclick="marcarContatoRapido('{{ w.wa_id }}', '{{ w.client_name }}', 'cliente')">👤 Cliente</button>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 2px 6px;" onclick="marcarContatoRapido('{{ w.wa_id }}', '{{ w.client_name }}', 'amigo')">🤝 Amigo</button>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 2px 6px;" onclick="marcarContatoRapido('{{ w.wa_id }}', '{{ w.client_name }}', 'familia')">👨‍👩‍👧 Família</button>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 2px 6px;" onclick="marcarContatoRapido('{{ w.wa_id }}', '{{ w.client_name }}', 'fornecedor')">📦 Fornecedor</button>
+                </div>
               </div>
             {% endfor %}
           {% else %}
@@ -607,6 +628,55 @@
             {% endfor %}
           </div>
         </section>
+      </div>
+
+      <!-- Gerenciador de Contatos e Rótulos (Cliente / Amigo / Família / Fornecedor) -->
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 16px; color: #fff; margin: 0;">👥 Gerenciador de Contatos (tabela contacts)</h3>
+            <p style="font-size: 12.5px; color: var(--muted); margin: 4px 0 0;">
+              Separe contatos entre <strong>Cliente, Amigo, Família e Fornecedor</strong>. Amigos e familiares não recebem ofertas de casamento — a Bruna apenas anota o recado.
+            </p>
+          </div>
+          <form onsubmit="return cadastrarContatoManual(event)" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input type="text" id="manualContactPhone" placeholder="WhatsApp (ex: 34999990000)" required style="background: #2a3942; color: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; min-width: 160px;" />
+            <input type="text" id="manualContactName" placeholder="Nome do Contato" style="background: #2a3942; color: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; min-width: 130px;" />
+            <select id="manualContactTipo" style="background: #2a3942; color: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px;">
+              <option value="cliente">👤 Cliente</option>
+              <option value="amigo">🤝 Amigo</option>
+              <option value="familia">👨‍👩‍👧 Família</option>
+              <option value="fornecedor">📦 Fornecedor</option>
+            </select>
+            <button type="submit" class="btn btn-green" style="font-size: 12px; padding: 6px 12px;">Salvar Contato</button>
+          </form>
+        </div>
+
+        <div id="contactsListContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 14px;">
+          {% if contacts %}
+            {% for ct in contacts %}
+              <div class="item-box" style="padding: 10px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <strong style="color: #fff; font-size: 13.5px;">{{ ct.name or 'Sem Nome' }}</strong>
+                    <div style="font-size: 11.5px; color: var(--muted);">📱 {{ ct.phone }}</div>
+                  </div>
+                  <span class="badge-status" style="font-size: 10.5px; padding: 2px 7px; {% if ct.tipo in ['amigo', 'familia', 'família'] %}background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #c084fc;{% elif ct.tipo == 'fornecedor' %}background: rgba(234, 67, 53, 0.2); color: #f28b82; border: 1px solid #f28b82;{% else %}background: rgba(37, 211, 102, 0.2); color: var(--green); border: 1px solid var(--green);{% endif %}">
+                    {{ ct.tipo|upper }}
+                  </span>
+                </div>
+                <div style="display: flex; gap: 4px; margin-top: 8px;">
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 3px 5px; flex: 1;" onclick="marcarContatoRapido('{{ ct.phone }}', '{{ ct.name }}', 'cliente')">Cliente</button>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 3px 5px; flex: 1;" onclick="marcarContatoRapido('{{ ct.phone }}', '{{ ct.name }}', 'amigo')">Amigo</button>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 3px 5px; flex: 1;" onclick="marcarContatoRapido('{{ ct.phone }}', '{{ ct.name }}', 'familia')">Família</button>
+                  <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 3px 5px; flex: 1;" onclick="marcarContatoRapido('{{ ct.phone }}', '{{ ct.name }}', 'fornecedor')">Fornecedor</button>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <p style="color: var(--muted); font-size: 13px; margin: 10px 0;">Nenhum contato classificado no momento.</p>
+          {% endif %}
+        </div>
       </div>
     </div><!-- Fim paneConversas -->
 
@@ -982,7 +1052,7 @@
     let slotIdParaCancelar = null;
 
     function mudarAba(aba) {
-      const abas = ['conversas', 'agendamentos', 'studio', 'ig'];
+      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente'];
       abas.forEach(a => {
         const btn = document.getElementById('tabBtn' + a.charAt(0).toUpperCase() + a.slice(1));
         const pane = document.getElementById('pane' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -1214,6 +1284,46 @@
       return processarEnvioChat(msg);
     }
 
+    let simTipoContatoAtual = 'cliente';
+    function trocarTipoContatoTeste(tipo) {
+      simTipoContatoAtual = tipo;
+      mostrarToast('Simulando conversa como ' + tipo.toUpperCase());
+    }
+
+    async function marcarContatoRapido(phone, name, tipo) {
+      if (!phone) return;
+      try {
+        const resp = await fetch('/api/contacts/upsert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studio_id: STUDIO_ID,
+            phone: phone,
+            name: name || '',
+            tipo: tipo
+          })
+        });
+        const res = await resp.json();
+        if (res && res.ok) {
+          mostrarToast(`Contato ${phone} marcado como ${tipo.toUpperCase()}!`);
+          setTimeout(() => window.location.reload(), 1200);
+        } else {
+          alert('Erro ao marcar contato: ' + (res.error || 'Tente novamente'));
+        }
+      } catch (e) {
+        alert('Erro de conexão ao salvar contato.');
+      }
+    }
+
+    async function cadastrarContatoManual(e) {
+      if (e) e.preventDefault();
+      const phone = document.getElementById('manualContactPhone').value.trim();
+      const name = document.getElementById('manualContactName').value.trim();
+      const tipo = document.getElementById('manualContactTipo').value;
+      await marcarContatoRapido(phone, name, tipo);
+      return false;
+    }
+
     async function processarEnvioChat(txt) {
       renderMensagemChat('user', txt, []);
       const btn = document.getElementById('btnSendChat');
@@ -1223,7 +1333,7 @@
         const resp = await fetch('/simular-conversa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studio_id: STUDIO_ID, text: txt })
+          body: JSON.stringify({ studio_id: STUDIO_ID, text: txt, tipo_contato: simTipoContatoAtual })
         });
         const data = await resp.json();
         if (data && data.ok) {
