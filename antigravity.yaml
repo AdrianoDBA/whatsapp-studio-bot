@@ -1,13 +1,15 @@
 name: whatsapp-studio-bot
-port: 5005
+runtime: docker
 domain: whatsapp-studio-bot.antigravity.app
+port: 5005
 healthcheck: /health
-env:
-    - GEMINI_API_KEY
-    - WHATSAPP_APP_ID
-    - WHATSAPP_APP_SECRET
-    - VERIFY_TOKEN
-    - ENCRYPTION_KEY
+
 volume:
   path: /data
   name: studio-data
+  size: 2GB
+
+env:
+    - USE_PROVIDER=cloud
+    - DB_PATH=/data/studio.db
+    - PUBLIC_BASE_URL=https://whatsapp-studio-bot.antigravity.app
