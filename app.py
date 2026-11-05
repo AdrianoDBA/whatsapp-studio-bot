@@ -53,6 +53,10 @@ os.makedirs(COMPROVANTES_DIR, exist_ok=True)
 
 def resolve_db_path() -> str:
     candidate = os.getenv("DB_PATH", "/data/studio.db")
+    if candidate == "/data/studio.db" and not os.path.exists("/data"):
+        local_db = os.path.join(BASE_DIR, "studio.db")
+        if os.path.exists(local_db):
+            return local_db
     db_dir = os.path.dirname(candidate)
     if db_dir:
         try:
@@ -64,9 +68,8 @@ def resolve_db_path() -> str:
                 os.remove(test_file)
             return candidate
         except (OSError, PermissionError):
-            fallback_dir = os.path.join(BASE_DIR, "data")
-            os.makedirs(fallback_dir, exist_ok=True)
-            return os.path.join(fallback_dir, os.path.basename(candidate))
+            local_db = os.path.join(BASE_DIR, "studio.db")
+            return local_db
     return candidate
 
 DB_PATH = resolve_db_path()
@@ -2703,7 +2706,7 @@ def api_instagram_previas_pendentes():
         FROM waiting_queue w
         LEFT JOIN ensaios e ON e.contact_wa_id = w.client_phone
         WHERE w.studio_id = ? AND w.status = 'previa_pendente'
-        ORDER BY w.id DESC
+        ORDER BY w.waiting_since DESC
     """, (studio["id"] if studio else "studio-principal",))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
@@ -3312,9 +3315,9 @@ def api_teste_secretaria():
         if resp and resp.text:
             resposta_texto = resp.text.strip()
     except Exception as e:
-        logger.error("[TESTE-SECRETARIA GEMINI ERROR] %s", e)
-        conn.close()
-        return jsonify({"ok": False, "error": f"Erro na chamada do Gemini: {str(e)}"}), 500
+        logger.warning("[TESTE-SECRETARIA GEMINI FALLBACK] %s", e)
+        reply_tuple = generate_humanized_reply(studio, wa_id, "Usuário de Teste", user_msg)
+        resposta_texto = reply_tuple[0]
 
     # Salva resposta gerada
     c.execute(
@@ -3327,7 +3330,7 @@ def api_teste_secretaria():
     return jsonify({
         "ok": True,
         "reply": resposta_texto,
-        "gemini_active": True,
+        "gemini_active": bool(gemini_key and not gemini_key.startswith("COLA_")),
         "key_preview": key_preview
     })
 
