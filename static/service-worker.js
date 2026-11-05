@@ -1,4 +1,4 @@
-const CACHE = 'bot-studio-v2';
+const CACHE = 'bot-studio-v3';
 const PRECACHE_URLS = [
   '/comecar',
   '/manifest.json',
@@ -8,6 +8,32 @@ const PRECACHE_URLS = [
   '/static/qr-comecar.png'
 ];
 
+// ============================================================================
+// INDEXEDDB NO CELULAR (PWA OFFLINE STORAGE)
+// Database: BotStudio (v1)
+// Stores: contacts (key: wa_id), ensaios (key: id), fila_offline (autoIncrement)
+// ============================================================================
+function openStudioDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("BotStudio", 1);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains("contacts")) {
+        db.createObjectStore("contacts", { keyPath: "wa_id" });
+      }
+      if (!db.objectStoreNames.contains("ensaios")) {
+        db.createObjectStore("ensaios", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("fila_offline")) {
+        db.createObjectStore("fila_offline", { autoIncrement: true });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Inicializa IndexedDB na ativação
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll(PRECACHE_URLS))
@@ -17,16 +43,19 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE && !key.startsWith('studio-bot-')) {
-            return caches.delete(key);
-          }
-          return null;
-        })
+    Promise.all([
+      openStudioDB().catch((e) => console.log('[ServiceWorker IDB init error]', e)),
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys.map((key) => {
+            if (key !== CACHE && !key.startsWith('studio-bot-')) {
+              return caches.delete(key);
+            }
+            return null;
+          })
+        )
       )
-    )
+    ])
   );
   self.clients.claim();
 });

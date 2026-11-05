@@ -350,17 +350,41 @@ def init_db():
         """
     )
 
-    # 8. contacts (cliente, amigo, familia)
+    # 8. contacts (cliente, amigo, familia, fornecedor, spam)
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS contacts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wa_id TEXT PRIMARY KEY,
             studio_id TEXT,
+            nome TEXT,
+            tipo TEXT CHECK(tipo IN ('cliente','amigo','familia','fornecedor','spam')) DEFAULT 'cliente',
+            first_contact_at TEXT,
+            last_contact_at TEXT,
+            total_conversas INTEGER DEFAULT 1,
+            pacote_interesse TEXT,
+            ja_comprou INTEGER DEFAULT 0,
             phone TEXT,
             name TEXT,
-            tipo TEXT DEFAULT 'cliente',
-            created_at TEXT,
-            UNIQUE(studio_id, phone)
+            created_at TEXT
+        )
+        """
+    )
+
+    # 8b. ensaios (Dashboard Kanban)
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ensaios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            studio_id TEXT,
+            contact_wa_id TEXT,
+            status TEXT CHECK(status IN ('agendado','em_atendimento','fotografando','editando','finalizado','cancelado')) DEFAULT 'agendado',
+            pacote TEXT,
+            start_at TEXT UNIQUE,
+            valor REAL,
+            comprovante_url TEXT,
+            previa_instagram_url TEXT,
+            avaliacao_enviada INTEGER DEFAULT 0,
+            created_at TEXT
         )
         """
     )
@@ -380,7 +404,25 @@ def init_db():
 
     conn.commit()
 
-    # Migrações seguras com PRAGMA table_info
+    # Migrações seguras com PRAGMA table_info para contacts
+    c.execute("PRAGMA table_info(contacts)")
+    con_cols = [r['name'] if isinstance(r, dict) else r[1] for r in c.fetchall()]
+    if 'wa_id' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN wa_id TEXT")
+    if 'nome' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN nome TEXT")
+    if 'first_contact_at' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN first_contact_at TEXT")
+    if 'last_contact_at' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN last_contact_at TEXT")
+    if 'total_conversas' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN total_conversas INTEGER DEFAULT 1")
+    if 'pacote_interesse' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN pacote_interesse TEXT")
+    if 'ja_comprou' not in con_cols:
+        c.execute("ALTER TABLE contacts ADD COLUMN ja_comprou INTEGER DEFAULT 0")
+
+    # Migrações seguras com PRAGMA table_info para studios
     c.execute("PRAGMA table_info(studios)")
     st_cols = [r['name'] if isinstance(r, dict) else r[1] for r in c.fetchall()]
     if 'consent_ip' not in st_cols:
@@ -469,6 +511,38 @@ def init_db():
         )
         conn.commit()
         ensure_slots_for_studio(row["id"], conn=conn)
+
+        # Seed inicial do Kanban (ensaios e contatos) se tabela estiver vazia
+        c.execute("SELECT COUNT(*) as cnt FROM ensaios")
+        if c.fetchone()["cnt"] == 0:
+            c.execute("""
+                INSERT INTO ensaios (studio_id, contact_wa_id, status, pacote, start_at, valor, comprovante_url, previa_instagram_url, created_at)
+                VALUES 
+                (?, '5534988771111', 'agendado', 'Casamento - Pacote Black', '2026-11-20T16:30', 11350.0, '/static/comprovantes/085cbda8.png', NULL, ?),
+                (?, '5534988772222', 'em_atendimento', 'Casamento - Pacote Premium', '2026-11-15T11:00', 8800.0, NULL, NULL, ?),
+                (?, '5534988773333', 'fotografando', 'Casamento - Pacote Premium', ?, 8800.0, NULL, NULL, ?),
+                (?, '5534988774444', 'editando', 'Casamento - Pacote Black', '2026-11-01T15:00', 11350.0, '/static/comprovantes/9f873634.png', NULL, ?),
+                (?, '5534988775555', 'finalizado', 'Casamento - Pacote Essencial', '2026-10-25T09:00', 7500.0, '/static/comprovantes/085cbda8.png', 'https://instagram.com/p/DEMO_17998877/', ?)
+            """, (
+                row["id"], now_iso(),
+                row["id"], now_iso(),
+                row["id"], f"{now_sp().date().isoformat()}T14:00", now_iso(),
+                row["id"], now_iso(),
+                row["id"], now_iso(),
+            ))
+            contacts_seed = [
+                ('5534988771111', 'Mariana & Carlos', 'cliente', 'Black', 1),
+                ('5534988772222', 'Ana & Pedro', 'cliente', 'Premium', 0),
+                ('5534988773333', 'Juliana & Lucas', 'cliente', 'Premium', 1),
+                ('5534988774444', 'Fernanda & Bruno', 'cliente', 'Black', 1),
+                ('5534988775555', 'Camila & Rafael', 'cliente', 'Essencial', 1)
+            ]
+            for w, n, t, p, b in contacts_seed:
+                c.execute("""
+                    INSERT OR IGNORE INTO contacts (wa_id, studio_id, nome, phone, name, tipo, pacote_interesse, ja_comprou, first_contact_at, last_contact_at, total_conversas)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2)
+                """, (w, row["id"], n, w, n, t, p, b, now_iso(), now_iso()))
+            conn.commit()
 
     conn.close()
 
@@ -1062,6 +1136,34 @@ def book_slot_and_generate_receipt(studio: dict, slot: dict, client_wa_id: str, 
         c.execute("DELETE FROM slots WHERE id = ? AND status != 'booked'", (slot["id"],))
         conn.commit()
 
+    # Grava ensaio correspondente na tabela ensaios para o Dashboard Kanban
+    valor_pacote = 8800.0
+    if "essencial" in niche_label.lower():
+        valor_pacote = 7500.0
+    elif "black" in niche_label.lower():
+        valor_pacote = 11350.0
+
+    try:
+        c.execute("""
+            INSERT INTO ensaios (studio_id, contact_wa_id, status, pacote, start_at, valor, comprovante_url, created_at)
+            VALUES (?, ?, 'agendado', ?, ?, ?, ?, ?)
+            ON CONFLICT(start_at) DO UPDATE SET
+                contact_wa_id = excluded.contact_wa_id,
+                status = 'agendado',
+                pacote = excluded.pacote,
+                valor = excluded.valor,
+                comprovante_url = excluded.comprovante_url
+        """, (studio["id"], client_wa_id, niche_label, slot["start_at"], valor_pacote, png_url, now_iso()))
+        # Atualiza status do contato em contacts
+        c.execute("""
+            UPDATE contacts 
+            SET ja_comprou = 1, pacote_interesse = ?, last_contact_at = ?
+            WHERE studio_id = ? AND (wa_id = ? OR phone = ?)
+        """, (niche_label, now_iso(), studio["id"], client_wa_id, client_wa_id))
+        conn.commit()
+    except Exception as e:
+        logger.warning("[KANBAN SYNC] Erro ao sincronizar ensaio agendado: %s", e)
+
     conn.close()
     return comprovante_id, png_url
 
@@ -1071,7 +1173,7 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
     Processa a mensagem do cliente com a proposta oficial do Gustavo Alves Fotografia:
     - 3 Pacotes Oficiais: Essencial (R$ 7.500), Premium (R$ 8.800 - Mais Contratado) e Black (R$ 11.350)
     - Extras: Pré-casamento (R$ 1.500), Civil (R$ 800), Hora extra (R$ 1.000), Álbum (R$ 4.950)
-    - Contatos tipo amigo/familia: Responde curto sem vender
+    - Economia de token: consulta contacts por wa_id, reusa histórico e amigos/família não recebem vendas
     - Chamada Gemini 1.5 Flash integrada
     Retorna: (reply_text, media_url, waiting_human, options_list)
     """
@@ -1082,20 +1184,36 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
 
     # Consulta tipo de contato na tabela contacts (cliente, amigo, familia)
     tipo_contato = 'cliente'
+    pacote_interesse = None
     try:
         conn_c = get_db()
         c_c = conn_c.cursor()
-        c_c.execute("SELECT tipo, name FROM contacts WHERE studio_id = ? AND phone = ?", (studio["id"], wa_id))
+        c_c.execute("SELECT tipo, name, nome, total_conversas, pacote_interesse FROM contacts WHERE studio_id = ? AND (wa_id = ? OR phone = ?)", (studio["id"], wa_id, wa_id))
         c_row = c_c.fetchone()
-        conn_c.close()
         if c_row:
             tipo_contato = (c_row["tipo"] or 'cliente').lower()
-            if not client_name and c_row["name"]:
-                client_name = c_row["name"]
-    except Exception:
-        pass
+            nome_salvo = c_row["nome"] if "nome" in c_row.keys() and c_row["nome"] else c_row["name"]
+            if not client_name and nome_salvo:
+                client_name = nome_salvo
+            if "pacote_interesse" in c_row.keys():
+                pacote_interesse = c_row["pacote_interesse"]
+            c_c.execute("""
+                UPDATE contacts 
+                SET total_conversas = COALESCE(total_conversas, 1) + 1, last_contact_at = ?
+                WHERE studio_id = ? AND (wa_id = ? OR phone = ?)
+            """, (now_iso(), studio["id"], wa_id, wa_id))
+            conn_c.commit()
+        else:
+            c_c.execute("""
+                INSERT OR IGNORE INTO contacts (studio_id, wa_id, phone, name, nome, tipo, first_contact_at, last_contact_at, total_conversas)
+                VALUES (?, ?, ?, ?, ?, 'cliente', ?, ?, 1)
+            """, (studio["id"], wa_id, wa_id, client_name or "Cliente", client_name or "Cliente", now_iso(), now_iso()))
+            conn_c.commit()
+        conn_c.close()
+    except Exception as e:
+        logger.debug("[CONTACTS TRACKING] %s", e)
 
-    # Regra: Amigo ou Família não recebe script de vendas
+    # Regra: Amigo ou Família não recebe script de vendas (economia de token)
     if tipo_contato in ['amigo', 'familia', 'família']:
         reply = f"Oi! É a {secretary_name}, o {photographer_name} tá em ensaio no momento. Quer que eu passe algum recado pra ele?"
         return limit_to_one_emoji(reply), None, False, ["Deixar Recado", "Falar com Fotógrafo"]
@@ -1108,6 +1226,7 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
         and not client_name.strip().startswith("Cliente ")
     )
     first_name = client_name.split()[0] if is_known_name else ""
+    vocativo = f", {first_name}" if first_name else ""
 
     # Opções padrão dos 3 pacotes reais do Gustavo
     interactive_niche_options = ["💍 Essencial", "⭐ Premium", "👑 Black"]
@@ -1116,6 +1235,40 @@ def generate_humanized_reply(studio: dict, wa_id: str, client_name: str, user_te
     if any(w in low for w in ["robô", "robo", "você é ia", "voce e ia", "assistente virtual", "é um bot", "e um bot"]):
         reply = f"Sou a {secretary_name}, secretária virtual aqui do estúdio do {photographer_name} 😊 Como posso te ajudar hoje?"
         return limit_to_one_emoji(reply), None, False, ["Conhecer Pacotes", "Ver Horários", "Falar com Gustavo"]
+
+    # 2. Fluxo: Cliente pede 'cadê minha prévia?' / prévias do Instagram
+    previa_patterns = ["prévia", "previa", "prévias", "previas", "fotos do casamento", "fotos do ensaio", "cadê minha prévia", "cade minha previa", "minhas fotos", "cadê minhas fotos"]
+    if any(p in low for p in previa_patterns):
+        try:
+            conn_p = get_db()
+            c_p = conn_p.cursor()
+            c_p.execute("SELECT * FROM ensaios WHERE contact_wa_id = ? ORDER BY id DESC LIMIT 1", (wa_id,))
+            ensaio_row = c_p.fetchone()
+            if ensaio_row:
+                ensaio_dict = dict(ensaio_row)
+                previa_link = ensaio_dict.get("previa_instagram_url")
+                if previa_link:
+                    conn_p.close()
+                    reply = f"Oi{vocativo}! Suas prévias já estão no Instagram oficial do Gustavo: {previa_link} 📸 Dá uma olhadinha lá e me conta o que achou!"
+                    return limit_to_one_emoji(reply), None, False, ["Ver no Instagram", "Falar com Fotógrafo"]
+
+                # Se ainda não postou, cria notificação na waiting_queue tipo previa_pendente
+                now_ts = time.time()
+                c_p.execute("""
+                    INSERT INTO waiting_queue (client_phone, studio_id, client_name, status, waiting_since, last_notification, stage, followup_count, message_content)
+                    VALUES (?, ?, ?, 'previa_pendente', ?, ?, 0, 0, ?)
+                    ON CONFLICT(client_phone) DO UPDATE SET
+                        status = 'previa_pendente',
+                        waiting_since = excluded.waiting_since,
+                        message_content = excluded.message_content
+                """, (wa_id, studio["id"], client_name if is_known_name else "Casal", now_ts, now_ts, user_text))
+                conn_p.commit()
+                conn_p.close()
+                reply = f"Oi{vocativo}! O {photographer_name} já está selecionando suas prévias na ilha de edição com muito carinho! Já coloquei um aviso urgente no painel dele e assim que publicar te mando o link direto, tá bom? 📸"
+                return limit_to_one_emoji(reply), None, False, ["Aguardar Prévia", "Falar com Fotógrafo"]
+            conn_p.close()
+        except Exception as e:
+            logger.warning("[PREVIAS CHECK] %s", e)
 
     # 2. Pedido de atendimento com humano / Gustavo / fotógrafo -> WAITING_HUMAN
     wants_human_patterns = [
@@ -2348,6 +2501,213 @@ def api_listar_agendamentos():
         })
 
     return jsonify({"ok": True, "agendamentos": formatted, "count": len(formatted)})
+
+
+# ==============================================================================
+# APIS KANBAN & POSTAGEM DE PRÉVIAS NO INSTAGRAM
+# ==============================================================================
+@app.route("/api/kanban", methods=["GET"])
+def api_kanban():
+    """
+    Retorna os ensaios distribuídos nas 4 colunas do Kanban:
+    - Agendados: ensaios com status 'agendado'
+    - Em Atendimento: ensaios 'em_atendimento' e itens da waiting_queue
+    - Fotografando: ensaios 'fotografando' ou agendados para a data de hoje
+    - Editando / Finalizado: ensaios 'editando' e 'finalizado'
+    """
+    studio = get_active_studio()
+    if not studio:
+        return jsonify({"ok": False, "error": "Studio não encontrado"}), 404
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT e.*, c.nome as contact_name
+        FROM ensaios e
+        LEFT JOIN contacts c ON (c.wa_id = e.contact_wa_id OR c.phone = e.contact_wa_id)
+        WHERE e.studio_id = ?
+        ORDER BY e.id DESC
+    """, (studio["id"],))
+    rows = [dict(r) for r in c.fetchall()]
+
+    # Consulta fila humana para compor 'em_atendimento'
+    c.execute("""
+        SELECT client_phone, client_name, status, message_content, waiting_since
+        FROM waiting_queue
+        WHERE studio_id = ?
+        ORDER BY waiting_since DESC
+    """, (studio["id"],))
+    waiting_items = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    today_str = now_sp().date().isoformat()
+
+    kanban = {
+        "agendados": [],
+        "em_atendimento": [],
+        "fotografando": [],
+        "editando_finalizado": []
+    }
+
+    for item in waiting_items:
+        kanban["em_atendimento"].append({
+            "id": f"wait_{item.get('client_phone')}",
+            "nome": item.get("client_name") or "Cliente Aguardando",
+            "contact_wa_id": item.get("client_phone"),
+            "pacote": "Aguardando Atendente Humano" if item.get("status") != "previa_pendente" else "🚨 Pedido de Prévia Urgente",
+            "valor": 0,
+            "status": "em_atendimento",
+            "is_queue": True
+        })
+
+    for r in rows:
+        st = r.get("status") or "agendado"
+        start_at = r.get("start_at") or ""
+        card = {
+            "id": r["id"],
+            "nome": r.get("contact_name") or (f"Casal ({mask_wa_id(r.get('contact_wa_id', ''))})" if r.get("contact_wa_id") else "Cliente"),
+            "contact_wa_id": r.get("contact_wa_id") or "",
+            "pacote": r.get("pacote") or "Casamento - Pacote Premium",
+            "valor": float(r.get("valor") or 8800.0),
+            "status": st,
+            "start_at": format_slot_human(start_at) if start_at else "",
+            "raw_start_at": start_at,
+            "comprovante_url": r.get("comprovante_url") or "",
+            "previa_instagram_url": r.get("previa_instagram_url") or "",
+            "is_queue": False
+        }
+
+        if st == "agendado":
+            if start_at.startswith(today_str):
+                card["status"] = "fotografando"
+                kanban["fotografando"].append(card)
+            else:
+                kanban["agendados"].append(card)
+        elif st == "em_atendimento":
+            kanban["em_atendimento"].append(card)
+        elif st == "fotografando":
+            kanban["fotografando"].append(card)
+        elif st in ("editando", "finalizado"):
+            kanban["editando_finalizado"].append(card)
+        else:
+            kanban["agendados"].append(card)
+
+    return jsonify({"ok": True, "kanban": kanban})
+
+
+@app.route("/api/kanban/mover", methods=["POST"])
+def api_kanban_mover():
+    """Move o status de um ensaio no Kanban (drag-and-drop)."""
+    data = request.get_json(silent=True) or {}
+    ensaio_id = data.get("id")
+    novo_status = data.get("status")
+    if not ensaio_id or not novo_status:
+        return jsonify({"ok": False, "error": "Parâmetros id e status obrigatórios"}), 400
+
+    if str(ensaio_id).startswith("wait_"):
+        return jsonify({"ok": True, "message": "Item da fila ignorado"}), 200
+
+    valid_statuses = ('agendado', 'em_atendimento', 'fotografando', 'editando', 'finalizado', 'cancelado')
+    if novo_status not in valid_statuses:
+        return jsonify({"ok": False, "error": f"Status inválido: {novo_status}"}), 400
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE ensaios SET status = ? WHERE id = ?", (novo_status, ensaio_id))
+    conn.commit()
+    conn.close()
+    logger.info("[KANBAN] Ensaio #%s movido para status '%s'", ensaio_id, novo_status)
+    return jsonify({"ok": True, "id": ensaio_id, "status": novo_status})
+
+
+@app.route("/api/instagram/postar-previa", methods=["POST"])
+def api_instagram_postar_previa():
+    """
+    Publica a prévia no Instagram (@gustavoalvsfotografia) e avisa o cliente no WhatsApp.
+    """
+    data = request.get_json(silent=True) or {}
+    ensaio_id = data.get("ensaio_id")
+    image_url = data.get("image_url") or "/static/demo_photos/casamento_01.jpg"
+    caption = data.get("caption") or "Prévias inesquecíveis @gustavoalvsfotografia 📸"
+    post_type = data.get("post_type", "feed")  # 'feed' ou 'story'
+
+    studio = get_active_studio()
+    if not studio:
+        return jsonify({"ok": False, "error": "Studio não encontrado"}), 404
+
+    # Busca o ensaio
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ensaios WHERE id = ?", (ensaio_id,))
+    ensaio_row = c.fetchone()
+    if not ensaio_row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Ensaio não encontrado"}), 404
+
+    ensaio = dict(ensaio_row)
+    contact_wa_id = ensaio.get("contact_wa_id")
+
+    # Garante URL absoluta para publicação se for foto local
+    if image_url.startswith("/"):
+        full_image_url = f"{PUBLIC_BASE_URL}{image_url}"
+    else:
+        full_image_url = image_url
+
+    from providers.instagram_provider import get_instagram_provider
+    ig_prov = get_instagram_provider(studio)
+
+    if post_type == "story":
+        res = ig_prov.post_story(image_url=full_image_url)
+    else:
+        res = ig_prov.post_feed(image_url=full_image_url, caption=caption)
+
+    if not res.get("success"):
+        conn.close()
+        return jsonify({"ok": False, "error": res.get("error", "Erro ao publicar no Instagram")}), 500
+
+    permalink = res.get("permalink") or "https://www.instagram.com/gustavoalvsfotografia/"
+
+    # Salva URL da prévia e marca como editando/finalizado
+    c.execute("""
+        UPDATE ensaios 
+        SET previa_instagram_url = ?, status = 'editando' 
+        WHERE id = ?
+    """, (permalink, ensaio_id))
+
+    # Remove pedido pendente da waiting_queue se houver
+    if contact_wa_id:
+        c.execute("DELETE FROM waiting_queue WHERE client_phone = ? AND status = 'previa_pendente'", (contact_wa_id,))
+    conn.commit()
+    conn.close()
+
+    # Envia WhatsApp automático avisando o cliente
+    if contact_wa_id:
+        msg_aviso = (
+            f"Oi! O Gustavo acabou de postar 3 prévias lindas do seu casamento no Instagram: {permalink} 📸 "
+            f"Corre lá pra ver e marcar a gente!"
+        )
+        send_whatsapp_message(studio, contact_wa_id, msg_aviso)
+        logger.info("[INSTAGRAM PREVIA] Link de prévia enviado via WhatsApp para %s", mask_wa_id(contact_wa_id))
+
+    return jsonify({"ok": True, "permalink": permalink, "simulated": res.get("simulated", False)})
+
+
+@app.route("/api/instagram/previas-pendentes", methods=["GET"])
+def api_instagram_previas_pendentes():
+    """Retorna clientes que pediram prévias pelo WhatsApp e ainda não foram atendidos."""
+    studio = get_active_studio()
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT w.*, e.id as ensaio_id, e.pacote, e.status as ensaio_status
+        FROM waiting_queue w
+        LEFT JOIN ensaios e ON e.contact_wa_id = w.client_phone
+        WHERE w.studio_id = ? AND w.status = 'previa_pendente'
+        ORDER BY w.id DESC
+    """, (studio["id"] if studio else "studio-principal",))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify({"ok": True, "previas_pendentes": rows, "count": len(rows)})
 
 
 @app.route("/dashboard/status", methods=["POST"])

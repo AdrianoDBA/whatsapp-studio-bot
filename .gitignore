@@ -12,3 +12,4 @@ whatsapp-gateway/auth_session/
 
 static/comprovantes/*.png
 uploads/*
+*.zip
