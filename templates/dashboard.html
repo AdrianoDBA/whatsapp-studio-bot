@@ -157,6 +157,55 @@
       flex-direction: column;
       gap: 8px;
     }
+    .kanban-board {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .kanban-col {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 520px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .kanban-col.drag-over {
+      background: rgba(37, 211, 102, 0.08);
+      border-color: var(--green);
+    }
+    .kanban-col-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .kanban-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .kanban-card:hover {
+      border-color: var(--green);
+      transform: translateY(-2px);
+    }
+    .kanban-card:active {
+      cursor: grabbing;
+    }
     .btn {
       padding: 9px 14px;
       border-radius: 8px;
@@ -443,12 +492,16 @@
         💬 Conversas ao Vivo
       </button>
       <button type="button" class="tab-btn" id="tabBtnAgendamentos" onclick="mudarAba('agendamentos')">
-        📅 Agendamentos
+        📊 Agendamentos (Esteira Kanban)
         {% if booked_slots %}
           <span style="background: var(--green); color: #111b21; border-radius: 10px; padding: 2px 7px; font-size: 11px; font-weight: 900;">
             {{ booked_slots|length }}
           </span>
         {% endif %}
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnKanban" onclick="mudarAba('agendamentos')" style="display: none;"></button>
+      <button type="button" class="tab-btn" id="tabBtnPrevias" onclick="mudarAba('previas')">
+        📸 Prévias Instagram
       </button>
       <button type="button" class="tab-btn" id="tabBtnPacotes" onclick="mudarAba('pacotes')">
         💍 Pacotes Oficiais (PDF)
@@ -680,94 +733,183 @@
       </div>
     </div><!-- Fim paneConversas -->
 
-    <!-- ABA 2: CENTRAL DE AGENDAMENTOS (MODAL ELEGANTE + NOTIFICAÇÃO REAL) -->
+    <!-- ABA 2: CENTRAL DE AGENDAMENTOS (ESTEIRA KANBAN + MODAL ELEGANTE + NOTIFICAÇÃO REAL) -->
     <div class="tab-pane" id="paneAgendamentos">
-      <!-- Filtros Rápidos -->
-      <div class="filter-bar">
-        <button type="button" class="filter-btn active-filter" id="filterBtnAll" onclick="filtrarAgendamentos('all')">
-          📋 Todos os Agendamentos
-        </button>
-        <button type="button" class="filter-btn" id="filterBtnToday" onclick="filtrarAgendamentos('today')">
-          ☀️ Hoje
-        </button>
-        <button type="button" class="filter-btn" id="filterBtnWeek" onclick="filtrarAgendamentos('week')">
-          📅 Esta Semana
-        </button>
+      <!-- Barra Superior da Esteira -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px;">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 800; color: #fff; margin: 0;">
+            📊 Esteira de Agendamentos & Produção (Kanban)
+          </h2>
+          <p style="font-size: 13.5px; color: var(--muted); margin-top: 4px;">
+            Acompanhe cada cliente pelo fluxo da esteira: arraste os cards entre as etapas de atendimento, ensaio e edição!
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-green" id="btnModoEsteira" onclick="alternarModoVisualizacao('esteira')">
+            📊 Modo Esteira (Kanban)
+          </button>
+          <button type="button" class="btn btn-outline" id="btnModoLista" onclick="alternarModoVisualizacao('lista')">
+            📋 Modo Lista Tradicional
+          </button>
+        </div>
       </div>
 
-      <!-- Grid de Cards de Agendamentos -->
-      <div class="appointments-grid" id="agendamentosGrid">
-        {% if booked_slots %}
-          {% for slot in booked_slots %}
-            <div
-              class="appointment-card booked"
-              id="card-slot-{{ slot.id }}"
-              data-date-iso="{{ slot.raw_start_at or '' }}"
-              data-slot-id="{{ slot.id }}"
-            >
-              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                  <strong style="color: #fff; font-size: 16px;">👤 {{ slot.client_name if (slot.client_name and slot.client_name != 'Cliente') else 'Cliente Confirmado' }}</strong>
-                  <div style="font-size: 13px; color: var(--muted); margin-top: 2px;">
-                    📱 {{ slot.client_wa_id or 'WhatsApp' }}
+      <!-- VISUALIZAÇÃO 1: ESTEIRA KANBAN (PADRÃO) -->
+      <div id="visaoEsteiraKanban" style="display: block;">
+        <!-- Métricas Rápidas da Esteira -->
+        <div class="metrics-grid" style="margin-bottom: 16px;">
+          <div class="metric-card">
+            <div class="metric-label">📅 1. Agendados</div>
+            <div class="metric-value" id="kMetricAgendados">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">💬 2. Em Atendimento</div>
+            <div class="metric-value" style="color: var(--warn);" id="kMetricAtendimento">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">📸 3. Fotografando (Hoje)</div>
+            <div class="metric-value" style="color: #60a5fa;" id="kMetricFotografando">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">🎨 4. Editando / Finalizados</div>
+            <div class="metric-value" style="color: #a78bfa;" id="kMetricEditando">0</div>
+          </div>
+        </div>
+
+        <!-- 4 Colunas Arrastáveis da Esteira Kanban -->
+        <div class="kanban-board">
+          <!-- Coluna 1: 📅 Agendados -->
+          <div class="kanban-col" id="colAgendados" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'agendado')">
+            <div class="kanban-col-header" style="border-top: 3px solid var(--green);">
+              <span>📅 1. Agendados</span>
+              <span class="badge" id="countAgendados">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listAgendados" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+
+          <!-- Coluna 2: 💬 Em Atendimento -->
+          <div class="kanban-col" id="colAtendimento" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'em_atendimento')">
+            <div class="kanban-col-header" style="border-top: 3px solid var(--warn);">
+              <span>💬 2. Em Atendimento</span>
+              <span class="badge" id="countAtendimento">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listAtendimento" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+
+          <!-- Coluna 3: 📸 Fotografando -->
+          <div class="kanban-col" id="colFotografando" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'fotografando')">
+            <div class="kanban-col-header" style="border-top: 3px solid #60a5fa;">
+              <span>📸 3. Fotografando (Hoje)</span>
+              <span class="badge" id="countFotografando">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listFotografando" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+
+          <!-- Coluna 4: 🎨 Editando / ✅ Finalizado -->
+          <div class="kanban-col" id="colEditando" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'editando')">
+            <div class="kanban-col-header" style="border-top: 3px solid #a78bfa;">
+              <span>🎨 4. Editando / Entregue</span>
+              <span class="badge" id="countEditando">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listEditando" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISUALIZAÇÃO 2: MODO LISTA / FILTROS -->
+      <div id="visaoListaCards" style="display: none;">
+        <!-- Filtros Rápidos -->
+        <div class="filter-bar">
+          <button type="button" class="filter-btn active-filter" id="filterBtnAll" onclick="filtrarAgendamentos('all')">
+            📋 Todos os Agendamentos
+          </button>
+          <button type="button" class="filter-btn" id="filterBtnToday" onclick="filtrarAgendamentos('today')">
+            ☀️ Hoje
+          </button>
+          <button type="button" class="filter-btn" id="filterBtnWeek" onclick="filtrarAgendamentos('week')">
+            📅 Esta Semana
+          </button>
+        </div>
+
+        <!-- Grid de Cards de Agendamentos -->
+        <div class="appointments-grid" id="agendamentosGrid">
+          {% if booked_slots %}
+            {% for slot in booked_slots %}
+              <div
+                class="appointment-card booked"
+                id="card-slot-{{ slot.id }}"
+                data-date-iso="{{ slot.raw_start_at or '' }}"
+                data-slot-id="{{ slot.id }}"
+              >
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <div>
+                    <strong style="color: #fff; font-size: 16px;">👤 {{ slot.client_name if (slot.client_name and slot.client_name != 'Cliente') else 'Cliente Confirmado' }}</strong>
+                    <div style="font-size: 13px; color: var(--muted); margin-top: 2px;">
+                      📱 {{ slot.client_wa_id or 'WhatsApp' }}
+                    </div>
+                  </div>
+                  <span class="niche-tag">
+                    {{ slot.niche or 'Ensaio Geral' }}
+                  </span>
+                </div>
+
+                <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                  <div style="font-size: 12px; color: var(--muted);">Data e Horário do Ensaio:</div>
+                  <div style="font-size: 15px; font-weight: 800; color: #fff; margin-top: 2px;">
+                    🕒 {{ slot.start_at }}
                   </div>
                 </div>
-                <span class="niche-tag">
-                  {{ slot.niche or 'Ensaio Geral' }}
-                </span>
-              </div>
 
-              <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 12px; color: var(--muted);">Data e Horário do Ensaio:</div>
-                <div style="font-size: 15px; font-weight: 800; color: #fff; margin-top: 2px;">
-                  🕒 {{ slot.start_at }}
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                  {% if slot.client_wa_id %}
+                    <a
+                      href="https://wa.me/{{ slot.client_wa_id }}"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="btn btn-outline"
+                      style="flex: 1;"
+                    >
+                      💬 WhatsApp
+                    </a>
+                  {% endif %}
+
+                  {% if slot.receipt_path or slot.comprovante_id %}
+                    <a
+                      href="{{ slot.receipt_path or ('/static/comprovantes/' ~ slot.comprovante_id ~ '.png') }}"
+                      target="_blank"
+                      class="btn btn-outline"
+                      style="border-color: var(--green); color: var(--green);"
+                    >
+                      📄 Ver Comprovante
+                    </a>
+                  {% endif %}
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; display: flex; justify-content: flex-end;">
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    id="btn-cancel-{{ slot.id }}"
+                    onclick="deletarAgendamentoReal({{ slot.id }})"
+                  >
+                    🗑️ Excluir Permanentemente
+                  </button>
                 </div>
               </div>
-
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
-                {% if slot.client_wa_id %}
-                  <a
-                    href="https://wa.me/{{ slot.client_wa_id }}"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="btn btn-outline"
-                    style="flex: 1;"
-                  >
-                    💬 WhatsApp
-                  </a>
-                {% endif %}
-
-                {% if slot.receipt_path or slot.comprovante_id %}
-                  <a
-                    href="{{ slot.receipt_path or ('/static/comprovantes/' ~ slot.comprovante_id ~ '.png') }}"
-                    target="_blank"
-                    class="btn btn-outline"
-                    style="border-color: var(--green); color: var(--green);"
-                  >
-                    📄 Ver Comprovante
-                  </a>
-                {% endif %}
-              </div>
-
-              <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; display: flex; justify-content: flex-end;">
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  id="btn-cancel-{{ slot.id }}"
-                  onclick="deletarAgendamentoReal({{ slot.id }})"
-                >
-                  🗑️ Excluir Permanentemente
-                </button>
-              </div>
+            {% endfor %}
+          {% else %}
+            <div style="grid-column: 1 / -1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 40px 20px; text-align: center;">
+              <p style="color: var(--muted); font-size: 15px;">
+                Nenhum agendamento ativo no momento. Quando um cliente reservar pelo WhatsApp, o card aparecerá aqui automaticamente com o comprovante!
+              </p>
             </div>
-          {% endfor %}
-        {% else %}
-          <div style="grid-column: 1 / -1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 40px 20px; text-align: center;">
-            <p style="color: var(--muted); font-size: 15px;">
-              Nenhum agendamento ativo no momento. Quando um cliente reservar pelo WhatsApp, o card aparecerá aqui automaticamente com o comprovante!
-            </p>
-          </div>
-        {% endif %}
+          {% endif %}
+        </div>
       </div>
     </div><!-- Fim paneAgendamentos -->
 
@@ -999,7 +1141,80 @@
         </section>
       </div>
     </div><!-- Fim paneIg -->
+
+    <!-- ABA PRÉVIAS INSTAGRAM -->
+    <div class="tab-pane" id="panePrevias">
+      <div class="card" style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="color: #E1306C; font-size: 20px; font-weight: 800; margin: 0;">📸 Gerenciador de Prévias no Instagram</h2>
+            <p style="color: var(--muted); font-size: 13.5px; margin-top: 4px;">
+              Poste prévias no perfil oficial <strong>@gustavoalvsfotografia</strong> com 1 clique e envie o link automaticamente no WhatsApp do casal!
+            </p>
+          </div>
+          <button type="button" class="btn btn-green" onclick="abrirModalPreviaManual()">
+            ➕ Publicar Nova Prévia
+          </button>
+        </div>
+
+        <h3 style="color: #fff; font-size: 16px; margin: 18px 0 10px;">🚨 Pedidos de Prévia pelo WhatsApp (Urgentes)</h3>
+        <div id="previasPendentesList" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="color: var(--muted); font-size: 13.5px; text-align: center; padding: 20px;">
+            Carregando pedidos de prévia...
+          </p>
+        </div>
+      </div>
+    </div>
   </main>
+
+  <!-- MODAL DE POSTAGEM DE PRÉVIAS NO INSTAGRAM -->
+  <dialog id="modalPostarPrevia" style="margin: auto; background: var(--card); color: var(--text); border: 2px solid #E1306C; border-radius: 18px; padding: 24px; max-width: 500px; width: calc(100% - 32px);">
+    <h3 style="color: #E1306C; font-size: 20px; margin-bottom: 8px;">📸 Postar Prévia no Instagram</h3>
+    <p style="font-size: 13.5px; color: var(--muted); margin-bottom: 16px;" id="modalPreviaSub">
+      Publicar prévia oficial para o casal no Instagram @gustavoalvsfotografia
+    </p>
+
+    <form onsubmit="return executarPostagemPrevia(event)">
+      <input type="hidden" id="previaEnsaioId" value="" />
+      
+      <div style="margin-bottom: 14px;">
+        <label style="font-size: 13px; color: var(--muted); font-weight: 700; display: block; margin-bottom: 6px;">
+          1. Onde deseja publicar?
+        </label>
+        <div style="display: flex; gap: 12px;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer;">
+            <input type="radio" name="previaTipo" value="feed" checked /> Feed do Instagram
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer;">
+            <input type="radio" name="previaTipo" value="story" /> Stories (24h)
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="font-size: 13px; color: var(--muted); font-weight: 700; display: block; margin-bottom: 6px;">
+          2. URL da Foto / Foto de Demonstração
+        </label>
+        <input type="text" id="previaImageUrl" class="search-input" style="width: 100%; box-sizing: border-box;" value="/static/demo_photos/casamento_01.jpg" placeholder="https://... ou caminho da foto" required />
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="font-size: 13px; color: var(--muted); font-weight: 700; display: block; margin-bottom: 6px;">
+          3. Legenda Oficial do Post
+        </label>
+        <textarea id="previaCaption" style="width: 100%; box-sizing: border-box; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; color: #fff; padding: 10px; font-size: 13.5px; min-height: 80px; resize: vertical;" placeholder="Escreva a legenda emocionante do casal...">Prévias inesquecíveis de casamento 💍 Cobertura oficial @gustavoalvsfotografia #Casamento #GustavoAlvesFotografia</textarea>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="submit" id="btnConfirmarPrevia" class="btn" style="background: #E1306C; color: #fff; font-weight: 900; padding: 12px;">
+          🚀 Publicar Prévia e Avisar no WhatsApp
+        </button>
+        <button type="button" class="btn btn-outline" onclick="fecharModalPrevia()">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- MODAL CUSTOMIZADO E ELEGANTE DE CANCELAMENTO -->
   <div class="custom-modal-backdrop" id="modalCancelarAgendamento">
@@ -1052,7 +1267,10 @@
     let slotIdParaCancelar = null;
 
     function mudarAba(aba) {
-      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente'];
+      if (aba === 'kanban') {
+        aba = 'agendamentos';
+      }
+      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente', 'previas'];
       abas.forEach(a => {
         const btn = document.getElementById('tabBtn' + a.charAt(0).toUpperCase() + a.slice(1));
         const pane = document.getElementById('pane' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -1060,7 +1278,245 @@
         if (pane) pane.classList.toggle('active-pane', a === aba);
       });
       if (aba === 'agendamentos') {
+        alternarModoVisualizacao('esteira');
+        carregarKanban();
+      } else if (aba === 'previas') {
+        carregarPreviasDinamico();
+      }
+    }
+
+    function alternarModoVisualizacao(modo) {
+      const visaoEsteira = document.getElementById('visaoEsteiraKanban');
+      const visaoLista = document.getElementById('visaoListaCards');
+      const btnEsteira = document.getElementById('btnModoEsteira');
+      const btnLista = document.getElementById('btnModoLista');
+
+      if (modo === 'esteira') {
+        if (visaoEsteira) visaoEsteira.style.display = 'block';
+        if (visaoLista) visaoLista.style.display = 'none';
+        if (btnEsteira) {
+          btnEsteira.className = 'btn btn-green';
+        }
+        if (btnLista) {
+          btnLista.className = 'btn btn-outline';
+        }
+        carregarKanban();
+      } else {
+        if (visaoEsteira) visaoEsteira.style.display = 'none';
+        if (visaoLista) visaoLista.style.display = 'block';
+        if (btnEsteira) {
+          btnEsteira.className = 'btn btn-outline';
+        }
+        if (btnLista) {
+          btnLista.className = 'btn btn-green';
+        }
         carregarAgendamentosDinamico();
+      }
+    }
+
+    // =========================================================================
+    // QUADRO KANBAN (DRAG AND DROP)
+    // =========================================================================
+    function allowDrop(ev) {
+      ev.preventDefault();
+      const col = ev.currentTarget;
+      if (col) col.classList.add('drag-over');
+    }
+
+    function dragLeaveKanban(ev) {
+      ev.preventDefault();
+      const col = ev.currentTarget;
+      if (col) col.classList.remove('drag-over');
+    }
+
+    function dragCard(ev) {
+      ev.dataTransfer.setData("text/plain", ev.currentTarget.dataset.id);
+    }
+
+    async function dropKanban(ev, novoStatus) {
+      ev.preventDefault();
+      const col = ev.currentTarget;
+      if (col) col.classList.remove('drag-over');
+
+      const cardId = ev.dataTransfer.getData("text/plain");
+      if (!cardId || cardId.startsWith('wait_')) return;
+
+      try {
+        const resp = await fetch('/api/kanban/mover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: cardId, status: novoStatus, acesso: DASHBOARD_CHAVE })
+        });
+        const res = await resp.json();
+        if (res.ok) {
+          mostrarToast(`Ensaio #${cardId} movido para ${novoStatus.toUpperCase()}!`);
+          carregarKanban();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function carregarKanban() {
+      try {
+        const resp = await fetch(`/api/kanban?acesso=${encodeURIComponent(DASHBOARD_CHAVE)}`);
+        const data = await resp.json();
+        if (!data || !data.ok || !data.kanban) return;
+
+        const k = data.kanban;
+        document.getElementById('countAgendados').textContent = k.agendados.length;
+        document.getElementById('countAtendimento').textContent = k.em_atendimento.length;
+        document.getElementById('countFotografando').textContent = k.fotografando.length;
+        document.getElementById('countEditando').textContent = k.editando_finalizado.length;
+
+        document.getElementById('kMetricAgendados').textContent = k.agendados.length;
+        document.getElementById('kMetricAtendimento').textContent = k.em_atendimento.length;
+        document.getElementById('kMetricFotografando').textContent = k.fotografando.length;
+        document.getElementById('kMetricEditando').textContent = k.editando_finalizado.length;
+
+        const renderCol = (listId, items) => {
+          const container = document.getElementById(listId);
+          if (!container) return;
+          if (!items || items.length === 0) {
+            container.innerHTML = `<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 30px 10px;">Nenhum ensaio aqui.</p>`;
+            return;
+          }
+          container.innerHTML = items.map(c => {
+            const cleanWa = (c.contact_wa_id || '').replace(/\D/g, '');
+            const waLink = cleanWa ? `https://wa.me/${cleanWa}` : '#';
+            const valorFmt = (c.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const previaBtn = `
+              <button type="button" class="btn" style="background: #E1306C; color: #fff; font-size: 12px; font-weight: 800; padding: 6px 10px; margin-top: 4px;" onclick="abrirModalPrevia(${c.id}, '${c.nome.replace(/'/g, "\\'")}', '${c.pacote.replace(/'/g, "\\'")}')">
+                📸 Postar Prévia no Instagram
+              </button>
+            `;
+            const previaLink = c.previa_instagram_url ? `
+              <a href="${c.previa_instagram_url}" target="_blank" style="color: #E1306C; font-size: 12px; font-weight: 700; text-decoration: none; margin-top: 4px; display: inline-block;">
+                ✅ Prévia no Instagram ↗
+              </a>
+            ` : '';
+
+            return `
+              <div class="kanban-card" draggable="${!c.is_queue}" data-id="${c.id}" ondragstart="dragCard(event)">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <strong style="color: #fff; font-size: 14.5px;">${c.nome}</strong>
+                  <span style="font-size: 12.5px; font-weight: 800; color: var(--green);">${valorFmt}</span>
+                </div>
+                <div style="font-size: 12.5px; color: var(--muted);">
+                  ${c.pacote}
+                </div>
+                ${c.start_at ? `<div style="font-size: 12px; color: #60a5fa;">📅 ${c.start_at}</div>` : ''}
+                <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap;">
+                  ${cleanWa ? `<a href="${waLink}" target="_blank" style="background: rgba(37, 211, 102, 0.15); color: var(--green); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; text-decoration: none;">💬 WhatsApp</a>` : ''}
+                  ${c.comprovante_url ? `<a href="${c.comprovante_url}" target="_blank" style="color: var(--muted); font-size: 11.5px; text-decoration: none;">📄 Comprovante</a>` : ''}
+                </div>
+                ${previaBtn}
+                ${previaLink}
+              </div>
+            `;
+          }).join('');
+        };
+
+        renderCol('listAgendados', k.agendados);
+        renderCol('listAtendimento', k.em_atendimento);
+        renderCol('listFotografando', k.fotografando);
+        renderCol('listEditando', k.editando_finalizado);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // =========================================================================
+    // PRÉVIAS INSTAGRAM
+    // =========================================================================
+    function abrirModalPrevia(ensaioId, nome, pacote) {
+      document.getElementById('previaEnsaioId').value = ensaioId;
+      document.getElementById('modalPreviaSub').textContent = `Publicar prévia oficial de ${nome} (${pacote}) no Instagram @gustavoalvsfotografia`;
+      document.getElementById('modalPostarPrevia').showModal();
+    }
+
+    function abrirModalPreviaManual() {
+      document.getElementById('previaEnsaioId').value = "1";
+      document.getElementById('modalPreviaSub').textContent = `Publicar prévia oficial de casamento no Instagram @gustavoalvsfotografia`;
+      document.getElementById('modalPostarPrevia').showModal();
+    }
+
+    function fecharModalPrevia() {
+      document.getElementById('modalPostarPrevia').close();
+    }
+
+    async function executarPostagemPrevia(event) {
+      event.preventDefault();
+      const btn = document.getElementById('btnConfirmarPrevia');
+      btn.textContent = 'PUBLICANDO NO INSTAGRAM...';
+      btn.disabled = true;
+
+      const ensaioId = document.getElementById('previaEnsaioId').value;
+      const imageUrl = document.getElementById('previaImageUrl').value;
+      const caption = document.getElementById('previaCaption').value;
+      const postType = document.querySelector('input[name="previaTipo"]:checked').value;
+
+      try {
+        const resp = await fetch('/api/instagram/postar-previa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ensaio_id: ensaioId,
+            image_url: imageUrl,
+            caption: caption,
+            post_type: postType
+          })
+        });
+        const res = await resp.json();
+        btn.textContent = '🚀 Publicar Prévia e Avisar no WhatsApp';
+        btn.disabled = false;
+        fecharModalPrevia();
+
+        if (res.ok) {
+          mostrarToast('📸 Prévia publicada no Instagram com sucesso! Link enviado ao casal no WhatsApp.');
+          carregarKanban();
+          carregarPreviasDinamico();
+        } else {
+          alert('Erro ao publicar: ' + (res.error || 'Falha na conexão'));
+        }
+      } catch (err) {
+        btn.textContent = '🚀 Publicar Prévia e Avisar no WhatsApp';
+        btn.disabled = false;
+        alert('Erro ao conectar com a API do Instagram.');
+      }
+    }
+
+    async function carregarPreviasDinamico() {
+      const container = document.getElementById('previasPendentesList');
+      if (!container) return;
+      try {
+        const resp = await fetch('/api/instagram/previas-pendentes');
+        const data = await resp.json();
+        if (!data || !data.ok || !data.previas_pendentes || data.previas_pendentes.length === 0) {
+          container.innerHTML = `
+            <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 30px; text-align: center;">
+              <p style="color: var(--muted); font-size: 14px; margin: 0;">
+                Nenhum pedido de prévia pendente no momento. Quando um casal perguntar "cadê minha prévia?" no WhatsApp, aparecerá aqui com destaque!
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = data.previas_pendentes.map(p => `
+          <div style="background: var(--panel); border: 1px solid #E1306C; border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <strong style="color: #fff; font-size: 15px;">${p.client_name || 'Casal'}</strong>
+              <span style="font-size: 13px; color: var(--muted); margin-left: 8px;">(${p.client_phone})</span>
+              <div style="font-size: 13px; color: #E1306C; margin-top: 4px;">💬 "${p.message_content}"</div>
+            </div>
+            <button type="button" class="btn" style="background: #E1306C; color: #fff; font-weight: 800; font-size: 13px;" onclick="abrirModalPrevia(${p.ensaio_id || 1}, '${(p.client_name || 'Casal').replace(/'/g, "\\'")}', '${(p.pacote || 'Casamento').replace(/'/g, "\\'")}')">
+              Postar Prévia no Instagram →
+            </button>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error(e);
       }
     }
 
@@ -1434,6 +1890,11 @@
         alert('Erro ao excluir agendamento.');
       }
     }
+
+    // Inicializa a esteira Kanban em background no carregamento
+    window.addEventListener('DOMContentLoaded', () => {
+      carregarKanban();
+    });
   </script>
 </body>
 </html>

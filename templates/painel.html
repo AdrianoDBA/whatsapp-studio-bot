@@ -491,19 +491,17 @@
       <button type="button" class="tab-btn active-tab" id="tabBtnConversas" onclick="mudarAba('conversas')">
         💬 Conversas ao Vivo
       </button>
-      <button type="button" class="tab-btn" id="tabBtnKanban" onclick="mudarAba('kanban')">
-        📊 Quadro Kanban
-      </button>
-      <button type="button" class="tab-btn" id="tabBtnPrevias" onclick="mudarAba('previas')">
-        📸 Prévias Instagram
-      </button>
       <button type="button" class="tab-btn" id="tabBtnAgendamentos" onclick="mudarAba('agendamentos')">
-        📅 Agendamentos
+        📊 Agendamentos (Esteira Kanban)
         {% if booked_slots %}
           <span style="background: var(--green); color: #111b21; border-radius: 10px; padding: 2px 7px; font-size: 11px; font-weight: 900;">
             {{ booked_slots|length }}
           </span>
         {% endif %}
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnKanban" onclick="mudarAba('agendamentos')" style="display: none;"></button>
+      <button type="button" class="tab-btn" id="tabBtnPrevias" onclick="mudarAba('previas')">
+        📸 Prévias Instagram
       </button>
       <button type="button" class="tab-btn" id="tabBtnPacotes" onclick="mudarAba('pacotes')">
         💍 Pacotes Oficiais (PDF)
@@ -735,94 +733,183 @@
       </div>
     </div><!-- Fim paneConversas -->
 
-    <!-- ABA 2: CENTRAL DE AGENDAMENTOS (MODAL ELEGANTE + NOTIFICAÇÃO REAL) -->
+    <!-- ABA 2: CENTRAL DE AGENDAMENTOS (ESTEIRA KANBAN + MODAL ELEGANTE + NOTIFICAÇÃO REAL) -->
     <div class="tab-pane" id="paneAgendamentos">
-      <!-- Filtros Rápidos -->
-      <div class="filter-bar">
-        <button type="button" class="filter-btn active-filter" id="filterBtnAll" onclick="filtrarAgendamentos('all')">
-          📋 Todos os Agendamentos
-        </button>
-        <button type="button" class="filter-btn" id="filterBtnToday" onclick="filtrarAgendamentos('today')">
-          ☀️ Hoje
-        </button>
-        <button type="button" class="filter-btn" id="filterBtnWeek" onclick="filtrarAgendamentos('week')">
-          📅 Esta Semana
-        </button>
+      <!-- Barra Superior da Esteira -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px;">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 800; color: #fff; margin: 0;">
+            📊 Esteira de Agendamentos & Produção (Kanban)
+          </h2>
+          <p style="font-size: 13.5px; color: var(--muted); margin-top: 4px;">
+            Acompanhe cada cliente pelo fluxo da esteira: arraste os cards entre as etapas de atendimento, ensaio e edição!
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-green" id="btnModoEsteira" onclick="alternarModoVisualizacao('esteira')">
+            📊 Modo Esteira (Kanban)
+          </button>
+          <button type="button" class="btn btn-outline" id="btnModoLista" onclick="alternarModoVisualizacao('lista')">
+            📋 Modo Lista Tradicional
+          </button>
+        </div>
       </div>
 
-      <!-- Grid de Cards de Agendamentos -->
-      <div class="appointments-grid" id="agendamentosGrid">
-        {% if booked_slots %}
-          {% for slot in booked_slots %}
-            <div
-              class="appointment-card booked"
-              id="card-slot-{{ slot.id }}"
-              data-date-iso="{{ slot.raw_start_at or '' }}"
-              data-slot-id="{{ slot.id }}"
-            >
-              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                  <strong style="color: #fff; font-size: 16px;">👤 {{ slot.client_name if (slot.client_name and slot.client_name != 'Cliente') else 'Cliente Confirmado' }}</strong>
-                  <div style="font-size: 13px; color: var(--muted); margin-top: 2px;">
-                    📱 {{ slot.client_wa_id or 'WhatsApp' }}
+      <!-- VISUALIZAÇÃO 1: ESTEIRA KANBAN (PADRÃO) -->
+      <div id="visaoEsteiraKanban" style="display: block;">
+        <!-- Métricas Rápidas da Esteira -->
+        <div class="metrics-grid" style="margin-bottom: 16px;">
+          <div class="metric-card">
+            <div class="metric-label">📅 1. Agendados</div>
+            <div class="metric-value" id="kMetricAgendados">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">💬 2. Em Atendimento</div>
+            <div class="metric-value" style="color: var(--warn);" id="kMetricAtendimento">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">📸 3. Fotografando (Hoje)</div>
+            <div class="metric-value" style="color: #60a5fa;" id="kMetricFotografando">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">🎨 4. Editando / Finalizados</div>
+            <div class="metric-value" style="color: #a78bfa;" id="kMetricEditando">0</div>
+          </div>
+        </div>
+
+        <!-- 4 Colunas Arrastáveis da Esteira Kanban -->
+        <div class="kanban-board">
+          <!-- Coluna 1: 📅 Agendados -->
+          <div class="kanban-col" id="colAgendados" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'agendado')">
+            <div class="kanban-col-header" style="border-top: 3px solid var(--green);">
+              <span>📅 1. Agendados</span>
+              <span class="badge" id="countAgendados">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listAgendados" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+
+          <!-- Coluna 2: 💬 Em Atendimento -->
+          <div class="kanban-col" id="colAtendimento" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'em_atendimento')">
+            <div class="kanban-col-header" style="border-top: 3px solid var(--warn);">
+              <span>💬 2. Em Atendimento</span>
+              <span class="badge" id="countAtendimento">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listAtendimento" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+
+          <!-- Coluna 3: 📸 Fotografando -->
+          <div class="kanban-col" id="colFotografando" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'fotografando')">
+            <div class="kanban-col-header" style="border-top: 3px solid #60a5fa;">
+              <span>📸 3. Fotografando (Hoje)</span>
+              <span class="badge" id="countFotografando">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listFotografando" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+
+          <!-- Coluna 4: 🎨 Editando / ✅ Finalizado -->
+          <div class="kanban-col" id="colEditando" ondragover="allowDrop(event)" ondragleave="dragLeaveKanban(event)" ondrop="dropKanban(event, 'editando')">
+            <div class="kanban-col-header" style="border-top: 3px solid #a78bfa;">
+              <span>🎨 4. Editando / Entregue</span>
+              <span class="badge" id="countEditando">0</span>
+            </div>
+            <div class="kanban-cards-list" id="listEditando" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISUALIZAÇÃO 2: MODO LISTA / FILTROS -->
+      <div id="visaoListaCards" style="display: none;">
+        <!-- Filtros Rápidos -->
+        <div class="filter-bar">
+          <button type="button" class="filter-btn active-filter" id="filterBtnAll" onclick="filtrarAgendamentos('all')">
+            📋 Todos os Agendamentos
+          </button>
+          <button type="button" class="filter-btn" id="filterBtnToday" onclick="filtrarAgendamentos('today')">
+            ☀️ Hoje
+          </button>
+          <button type="button" class="filter-btn" id="filterBtnWeek" onclick="filtrarAgendamentos('week')">
+            📅 Esta Semana
+          </button>
+        </div>
+
+        <!-- Grid de Cards de Agendamentos -->
+        <div class="appointments-grid" id="agendamentosGrid">
+          {% if booked_slots %}
+            {% for slot in booked_slots %}
+              <div
+                class="appointment-card booked"
+                id="card-slot-{{ slot.id }}"
+                data-date-iso="{{ slot.raw_start_at or '' }}"
+                data-slot-id="{{ slot.id }}"
+              >
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <div>
+                    <strong style="color: #fff; font-size: 16px;">👤 {{ slot.client_name if (slot.client_name and slot.client_name != 'Cliente') else 'Cliente Confirmado' }}</strong>
+                    <div style="font-size: 13px; color: var(--muted); margin-top: 2px;">
+                      📱 {{ slot.client_wa_id or 'WhatsApp' }}
+                    </div>
+                  </div>
+                  <span class="niche-tag">
+                    {{ slot.niche or 'Ensaio Geral' }}
+                  </span>
+                </div>
+
+                <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
+                  <div style="font-size: 12px; color: var(--muted);">Data e Horário do Ensaio:</div>
+                  <div style="font-size: 15px; font-weight: 800; color: #fff; margin-top: 2px;">
+                    🕒 {{ slot.start_at }}
                   </div>
                 </div>
-                <span class="niche-tag">
-                  {{ slot.niche or 'Ensaio Geral' }}
-                </span>
-              </div>
 
-              <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;">
-                <div style="font-size: 12px; color: var(--muted);">Data e Horário do Ensaio:</div>
-                <div style="font-size: 15px; font-weight: 800; color: #fff; margin-top: 2px;">
-                  🕒 {{ slot.start_at }}
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                  {% if slot.client_wa_id %}
+                    <a
+                      href="https://wa.me/{{ slot.client_wa_id }}"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="btn btn-outline"
+                      style="flex: 1;"
+                    >
+                      💬 WhatsApp
+                    </a>
+                  {% endif %}
+
+                  {% if slot.receipt_path or slot.comprovante_id %}
+                    <a
+                      href="{{ slot.receipt_path or ('/static/comprovantes/' ~ slot.comprovante_id ~ '.png') }}"
+                      target="_blank"
+                      class="btn btn-outline"
+                      style="border-color: var(--green); color: var(--green);"
+                    >
+                      📄 Ver Comprovante
+                    </a>
+                  {% endif %}
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; display: flex; justify-content: flex-end;">
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    id="btn-cancel-{{ slot.id }}"
+                    onclick="deletarAgendamentoReal({{ slot.id }})"
+                  >
+                    🗑️ Excluir Permanentemente
+                  </button>
                 </div>
               </div>
-
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
-                {% if slot.client_wa_id %}
-                  <a
-                    href="https://wa.me/{{ slot.client_wa_id }}"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="btn btn-outline"
-                    style="flex: 1;"
-                  >
-                    💬 WhatsApp
-                  </a>
-                {% endif %}
-
-                {% if slot.receipt_path or slot.comprovante_id %}
-                  <a
-                    href="{{ slot.receipt_path or ('/static/comprovantes/' ~ slot.comprovante_id ~ '.png') }}"
-                    target="_blank"
-                    class="btn btn-outline"
-                    style="border-color: var(--green); color: var(--green);"
-                  >
-                    📄 Ver Comprovante
-                  </a>
-                {% endif %}
-              </div>
-
-              <div style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; display: flex; justify-content: flex-end;">
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  id="btn-cancel-{{ slot.id }}"
-                  onclick="deletarAgendamentoReal({{ slot.id }})"
-                >
-                  🗑️ Excluir Permanentemente
-                </button>
-              </div>
+            {% endfor %}
+          {% else %}
+            <div style="grid-column: 1 / -1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 40px 20px; text-align: center;">
+              <p style="color: var(--muted); font-size: 15px;">
+                Nenhum agendamento ativo no momento. Quando um cliente reservar pelo WhatsApp, o card aparecerá aqui automaticamente com o comprovante!
+              </p>
             </div>
-          {% endfor %}
-        {% else %}
-          <div style="grid-column: 1 / -1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 40px 20px; text-align: center;">
-            <p style="color: var(--muted); font-size: 15px;">
-              Nenhum agendamento ativo no momento. Quando um cliente reservar pelo WhatsApp, o card aparecerá aqui automaticamente com o comprovante!
-            </p>
-          </div>
-        {% endif %}
+          {% endif %}
+        </div>
       </div>
     </div><!-- Fim paneAgendamentos -->
 
@@ -1055,70 +1142,6 @@
       </div>
     </div><!-- Fim paneIg -->
 
-    <!-- ABA KANBAN: 4 COLUNAS ARRASTÁVEIS -->
-    <div class="tab-pane" id="paneKanban">
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-label">📅 Agendados</div>
-          <div class="metric-value" id="kMetricAgendados">0</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">💬 Em Atendimento</div>
-          <div class="metric-value" style="color: var(--warn);" id="kMetricAtendimento">0</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">📸 Fotografando Hoje</div>
-          <div class="metric-value" style="color: #60a5fa;" id="kMetricFotografando">0</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">🎨 Editando / ✅ Finalizados</div>
-          <div class="metric-value" style="color: #a78bfa;" id="kMetricEditando">0</div>
-        </div>
-      </div>
-
-      <div class="kanban-board">
-        <!-- Coluna 1: 📅 Agendados -->
-        <div class="kanban-col" id="colAgendados" ondragover="allowDrop(event)" ondrop="dropKanban(event, 'agendado')">
-          <div class="kanban-col-header" style="border-top: 3px solid var(--green);">
-            <span>📅 Agendados</span>
-            <span class="badge" id="countAgendados">0</span>
-          </div>
-          <div class="kanban-cards-list" id="listAgendados" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
-          </div>
-        </div>
-
-        <!-- Coluna 2: 💬 Em Atendimento -->
-        <div class="kanban-col" id="colAtendimento" ondragover="allowDrop(event)" ondrop="dropKanban(event, 'em_atendimento')">
-          <div class="kanban-col-header" style="border-top: 3px solid var(--warn);">
-            <span>💬 Em Atendimento</span>
-            <span class="badge" id="countAtendimento">0</span>
-          </div>
-          <div class="kanban-cards-list" id="listAtendimento" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
-          </div>
-        </div>
-
-        <!-- Coluna 3: 📸 Fotografando -->
-        <div class="kanban-col" id="colFotografando" ondragover="allowDrop(event)" ondrop="dropKanban(event, 'fotografando')">
-          <div class="kanban-col-header" style="border-top: 3px solid #60a5fa;">
-            <span>📸 Fotografando</span>
-            <span class="badge" id="countFotografando">0</span>
-          </div>
-          <div class="kanban-cards-list" id="listFotografando" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
-          </div>
-        </div>
-
-        <!-- Coluna 4: 🎨 Editando / ✅ Finalizado -->
-        <div class="kanban-col" id="colEditando" ondragover="allowDrop(event)" ondrop="dropKanban(event, 'editando')">
-          <div class="kanban-col-header" style="border-top: 3px solid #a78bfa;">
-            <span>🎨 Editando / ✅ Finalizado</span>
-            <span class="badge" id="countEditando">0</span>
-          </div>
-          <div class="kanban-cards-list" id="listEditando" style="display: flex; flex-direction: column; gap: 10px; min-height: 400px;">
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ABA PRÉVIAS INSTAGRAM -->
     <div class="tab-pane" id="panePrevias">
       <div class="card" style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px;">
@@ -1244,7 +1267,10 @@
     let slotIdParaCancelar = null;
 
     function mudarAba(aba) {
-      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente', 'kanban', 'previas'];
+      if (aba === 'kanban') {
+        aba = 'agendamentos';
+      }
+      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente', 'previas'];
       abas.forEach(a => {
         const btn = document.getElementById('tabBtn' + a.charAt(0).toUpperCase() + a.slice(1));
         const pane = document.getElementById('pane' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -1252,11 +1278,39 @@
         if (pane) pane.classList.toggle('active-pane', a === aba);
       });
       if (aba === 'agendamentos') {
-        carregarAgendamentosDinamico();
-      } else if (aba === 'kanban') {
+        alternarModoVisualizacao('esteira');
         carregarKanban();
       } else if (aba === 'previas') {
         carregarPreviasDinamico();
+      }
+    }
+
+    function alternarModoVisualizacao(modo) {
+      const visaoEsteira = document.getElementById('visaoEsteiraKanban');
+      const visaoLista = document.getElementById('visaoListaCards');
+      const btnEsteira = document.getElementById('btnModoEsteira');
+      const btnLista = document.getElementById('btnModoLista');
+
+      if (modo === 'esteira') {
+        if (visaoEsteira) visaoEsteira.style.display = 'block';
+        if (visaoLista) visaoLista.style.display = 'none';
+        if (btnEsteira) {
+          btnEsteira.className = 'btn btn-green';
+        }
+        if (btnLista) {
+          btnLista.className = 'btn btn-outline';
+        }
+        carregarKanban();
+      } else {
+        if (visaoEsteira) visaoEsteira.style.display = 'none';
+        if (visaoLista) visaoLista.style.display = 'block';
+        if (btnEsteira) {
+          btnEsteira.className = 'btn btn-outline';
+        }
+        if (btnLista) {
+          btnLista.className = 'btn btn-green';
+        }
+        carregarAgendamentosDinamico();
       }
     }
 
@@ -1267,6 +1321,12 @@
       ev.preventDefault();
       const col = ev.currentTarget;
       if (col) col.classList.add('drag-over');
+    }
+
+    function dragLeaveKanban(ev) {
+      ev.preventDefault();
+      const col = ev.currentTarget;
+      if (col) col.classList.remove('drag-over');
     }
 
     function dragCard(ev) {
@@ -1830,6 +1890,11 @@
         alert('Erro ao excluir agendamento.');
       }
     }
+
+    // Inicializa a esteira Kanban em background no carregamento
+    window.addEventListener('DOMContentLoaded', () => {
+      carregarKanban();
+    });
   </script>
 </body>
 </html>
