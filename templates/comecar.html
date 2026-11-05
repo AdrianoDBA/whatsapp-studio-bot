@@ -308,6 +308,7 @@
     const DASHBOARD_URL = '{{ dashboard_url }}';
     let qrPollTimer = null;
     let isConnectedGlobal = false;
+    let tentativasSemQr = 0;
 
     function fecharModalConexao() {
       const modal = document.getElementById('modalConexao');
@@ -415,6 +416,7 @@
         if (mainBtnPainel) mainBtnPainel.style.display = 'none';
 
         if (data && data.qr) {
+          tentativasSemQr = 0;
           // Modal QR active
           if (title) title.textContent = '📲 Escaneie o QR Code no seu Celular';
           if (statusTxt) statusTxt.innerHTML = 'Abra o WhatsApp no celular > <strong>Aparelhos conectados</strong> > <strong>Conectar um aparelho</strong> e aponte para a tela:';
@@ -441,15 +443,36 @@
           return;
         }
 
+        tentativasSemQr++;
         // Warming up or waiting
-        if (modalLoading) modalLoading.style.display = 'block';
+        if (modalLoading) {
+          modalLoading.style.display = 'block';
+          if (tentativasSemQr >= 4) {
+            modalLoading.innerHTML = '⏳ Gerando QR Code do WhatsApp...<br><button type="button" onclick="gerarNovoQrWhatsApp()" style="margin-top: 10px; background: #25D366; color: #111b21; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; cursor: pointer;">Forçar Novo QR Code</button>';
+          } else {
+            modalLoading.innerHTML = '⏳ Carregando QR Code do WhatsApp...';
+          }
+        }
         if (qrImg) qrImg.style.display = 'none';
         if (modalSuccess) modalSuccess.style.display = 'none';
-        if (mainLoading) mainLoading.style.display = 'block';
+        if (mainLoading) {
+          mainLoading.style.display = 'block';
+          if (tentativasSemQr >= 4) {
+            mainLoading.innerHTML = '⏳ Gerando QR Code do WhatsApp...<br><button type="button" onclick="gerarNovoQrWhatsApp()" style="margin-top: 10px; background: #25D366; color: #111b21; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; cursor: pointer;">Forçar Novo QR Code</button>';
+          } else {
+            mainLoading.innerHTML = '⏳ Gerando QR Code do WhatsApp...';
+          }
+        }
         if (mainImg) mainImg.style.display = 'none';
         if (mainSuccess) mainSuccess.style.display = 'none';
         if (title) title.textContent = '⏳ Gerando QR Code do WhatsApp...';
-        if (statusTxt) statusTxt.textContent = 'Aguarde alguns segundos enquanto preparamos a conexão do seu WhatsApp...';
+        if (statusTxt) {
+          if (tentativasSemQr >= 4) {
+            statusTxt.innerHTML = 'Demorando para responder? <a href="javascript:void(0)" onclick="gerarNovoQrWhatsApp()" style="color: #25D366; font-weight: 800; text-decoration: underline;">Clique aqui para reiniciar e gerar um novo QR Code</a>.';
+          } else {
+            statusTxt.textContent = 'Aguarde alguns segundos enquanto preparamos a conexão do seu WhatsApp...';
+          }
+        }
         if (btnConnect) {
           btnConnect.textContent = 'CONECTAR MEU WHATSAPP →';
           btnConnect.onclick = iniciarConexaoUmClique;
@@ -464,6 +487,7 @@
     }
 
     async function gerarNovoQrWhatsApp() {
+      tentativasSemQr = 0;
       const title = document.getElementById('modalTitle');
       const statusTxt = document.getElementById('modalStatusText');
       const modalLoading = document.getElementById('modalQrLoading');
@@ -475,17 +499,23 @@
 
       if (title) title.textContent = '🔄 Preparando Novo QR Code...';
       if (statusTxt) statusTxt.textContent = 'Desconectando sessão anterior e gerando um novo QR Code para você escanear...';
-      if (modalLoading) modalLoading.style.display = 'block';
+      if (modalLoading) {
+        modalLoading.innerHTML = '🔄 Reiniciando conexão e gerando QR Code...';
+        modalLoading.style.display = 'block';
+      }
       if (qrImg) qrImg.style.display = 'none';
       if (modalSuccess) modalSuccess.style.display = 'none';
-      if (mainLoading) mainLoading.style.display = 'block';
+      if (mainLoading) {
+        mainLoading.innerHTML = '🔄 Reiniciando conexão e gerando QR Code...';
+        mainLoading.style.display = 'block';
+      }
       if (mainImg) mainImg.style.display = 'none';
       if (mainSuccess) mainSuccess.style.display = 'none';
 
       try {
         await fetch('/desconectar-whatsapp', { method: 'POST' });
       } catch (e) {}
-      setTimeout(atualizarEstadoModal, 1500);
+      setTimeout(atualizarEstadoModal, 1000);
     }
 
     // Auto-poll on load

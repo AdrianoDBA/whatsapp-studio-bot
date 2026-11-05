@@ -3603,6 +3603,40 @@ def health():
     return jsonify({"status": "ok", "db": os.path.exists(DB_PATH)}), 200
 
 
+_gateway_process = None
+
+
+def ensure_gateway_running():
+    """Garante que o gateway Baileys do WhatsApp na porta 5006 esteja online quando executando localmente."""
+    global _gateway_process
+    try:
+        r = requests.get(f"{GATEWAY_URL}/status", timeout=1)
+        if r.status_code == 200:
+            return True
+    except Exception:
+        pass
+
+    if "127.0.0.1" in GATEWAY_URL or "localhost" in GATEWAY_URL:
+        gateway_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp-gateway")
+        gateway_file = os.path.join(gateway_dir, "gateway.js")
+        if os.path.exists(gateway_file):
+            try:
+                logger.info("[GATEWAY WATCHDOG] Iniciando whatsapp-gateway na porta 5006 em background...")
+                _gateway_process = subprocess.Popen(
+                    ["node", "gateway.js"],
+                    cwd=gateway_dir,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                time.sleep(1.5)
+                r = requests.get(f"{GATEWAY_URL}/status", timeout=2)
+                return r.status_code == 200
+            except Exception as e:
+                logger.error("[GATEWAY WATCHDOG] Falha ao iniciar processo do gateway: %s", e)
+    return False
+
+
 @app.route("/status-conexao")
 @app.route("/api/qr_status")
 def status_conexao():
@@ -3614,6 +3648,9 @@ def status_conexao():
             conn.execute("UPDATE studios SET status = 'ACTIVE' WHERE id = ?", (st["id"],))
             conn.commit()
             conn.close()
+
+    ensure_gateway_running()
+
     try:
         r = requests.get(f"{GATEWAY_URL}/status", timeout=2)
         if r.status_code == 200:
@@ -3627,12 +3664,17 @@ def status_conexao():
 @app.route("/api/qr_disconnect", methods=["POST"])
 def desconectar_whatsapp():
     """Desconecta sessão atual do gateway para gerar um novo QR Code."""
+    ensure_gateway_running()
     try:
         r = requests.post(f"{GATEWAY_URL}/disconnect", timeout=4)
         if r.status_code == 200:
             return jsonify(r.json()), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        auth_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp-gateway", "auth_session")
+        if os.path.exists(auth_dir):
+            import shutil
+            shutil.rmtree(auth_dir, ignore_errors=True)
+        return jsonify({"status": "ok", "message": "Sessão resetada"}), 200
     return jsonify({"status": "ok"}), 200
 
 

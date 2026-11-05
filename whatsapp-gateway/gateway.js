@@ -57,7 +57,24 @@ function unwrapMessageContent(m) {
   return m;
 }
 
+// Process error guards to prevent crash from unexpected disconnects
+process.on('uncaughtException', (err) => {
+  console.error('[GATEWAY UNCAUGHT EXCEPTION]', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[GATEWAY UNHANDLED REJECTION]', reason);
+});
+
 async function startSock() {
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners();
+      sock.end();
+    } catch (e) {}
+    sock = null;
+  }
+
   if (!fs.existsSync(AUTH_DIR)) {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
   }
@@ -318,14 +335,20 @@ app.post('/send', async (req, res) => {
 
 app.post('/disconnect', (req, res) => {
   try {
-    if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-    }
     currentStatus = 'DISCONNECTED';
     currentQR = null;
     connectedNumber = null;
-    if (sock) sock.end();
-    setTimeout(startSock, 1000);
+    if (sock) {
+      try {
+        sock.ev.removeAllListeners();
+        sock.end();
+      } catch (e) {}
+      sock = null;
+    }
+    if (fs.existsSync(AUTH_DIR)) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    }
+    setTimeout(startSock, 800);
     res.json({ status: 'ok', message: 'Desconectado com sucesso' });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1839,14 +1839,74 @@
       }
     }
 
-    function abrirModalWhatsAppPainel() {
+    let waModalPollTimer = null;
+
+    async function abrirModalWhatsAppPainel() {
       const m = document.getElementById('modalPainelWa');
       if (m && !m.open) m.showModal();
+      await atualizarModalWaPainel();
+      if (!waModalPollTimer) {
+        waModalPollTimer = setInterval(atualizarModalWaPainel, 2500);
+      }
     }
 
     function fecharModalWaPainel() {
       const m = document.getElementById('modalPainelWa');
       if (m) m.close();
+      if (waModalPollTimer) {
+        clearInterval(waModalPollTimer);
+        waModalPollTimer = null;
+      }
+    }
+
+    async function atualizarModalWaPainel() {
+      const title = document.getElementById('waModalTitle');
+      const text = document.getElementById('waModalText');
+      const qrBox = document.getElementById('waModalQrBox');
+      const qrImg = document.getElementById('waModalQrImg');
+
+      try {
+        const resp = await fetch('/status-conexao?auto_start=1');
+        const data = await resp.json();
+
+        if (data && data.status === 'CONNECTED') {
+          const num = data.connectedNumber ? ('+' + data.connectedNumber) : 'Seu WhatsApp';
+          if (title) title.textContent = '✅ WhatsApp Conectado com Sucesso!';
+          if (text) text.innerHTML = `O número <strong>${num}</strong> está ativo e respondendo aos clientes automaticamente.`;
+          if (qrBox) qrBox.style.display = 'none';
+          return;
+        }
+
+        if (data && data.qr) {
+          if (title) title.textContent = '📲 Escaneie o QR Code no seu Celular';
+          if (text) text.innerHTML = 'Abra o WhatsApp no celular > <strong>Aparelhos conectados</strong> > <strong>Conectar um aparelho</strong> e aponte para a tela:';
+          if (qrImg) qrImg.src = data.qr;
+          if (qrBox) qrBox.style.display = 'block';
+          return;
+        }
+
+        if (title) title.textContent = '⏳ Gerando QR Code do WhatsApp...';
+        if (text) text.textContent = 'Preparando conexão local segura com o WhatsApp. Aguarde alguns instantes...';
+        if (qrBox) qrBox.style.display = 'none';
+      } catch (e) {
+        if (text) text.textContent = 'Tentando conectar com o serviço do WhatsApp...';
+      }
+    }
+
+    async function gerarNovoQrNoPainel() {
+      const title = document.getElementById('waModalTitle');
+      const text = document.getElementById('waModalText');
+      const qrBox = document.getElementById('waModalQrBox');
+
+      if (title) title.textContent = '🔄 Preparando Novo QR Code...';
+      if (text) text.textContent = 'Desconectando sessão anterior e gerando um código novo...';
+      if (qrBox) qrBox.style.display = 'none';
+
+      try {
+        await fetch('/desconectar-whatsapp', { method: 'POST' });
+      } catch (e) {}
+
+      setTimeout(atualizarModalWaPainel, 1500);
     }
 
     async function mudarModoExpediente(novoModo) {

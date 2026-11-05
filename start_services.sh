@@ -17,6 +17,7 @@ sleep 1
 echo "[2/4] Iniciando WhatsApp Baileys Gateway (porta 5006)..."
 cd "$DIR/whatsapp-gateway"
 nohup node gateway.js > "$DIR/logs/gateway.log" 2>&1 &
+disown $! 2>/dev/null || true
 cd "$DIR"
 
 # 3. Inicia servidor Web Flask/Gunicorn (porta 5005)
@@ -25,6 +26,7 @@ export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 export USE_PROVIDER=baileys
 export DB_PATH="$DIR/studio.db"
 nohup "$DIR/.venv/bin/gunicorn" --bind 0.0.0.0:5005 --workers 1 --threads 4 --timeout 120 app:app --chdir "$DIR" > "$DIR/logs/gunicorn.log" 2>&1 &
+disown $! 2>/dev/null || true
 
 # 4. Aguarda inicialização e verifica saúde dos serviços
 echo "[4/4] Verificando serviços locais..."
