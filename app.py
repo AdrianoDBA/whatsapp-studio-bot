@@ -547,7 +547,113 @@ def init_db():
                 """, (w, row["id"], n, w, n, t, p, b, now_iso(), now_iso()))
             conn.commit()
 
+        # 8. test_profiles (Multi-Sessão Baileys: 4 perfis fixos com isolamento)
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS test_profiles (
+                id TEXT PRIMARY KEY,
+                apelido TEXT NOT NULL,
+                pasta_sessao TEXT NOT NULL,
+                status TEXT DEFAULT 'DISCONNECTED',
+                ultimo_conectado TEXT,
+                phone_number TEXT,
+                is_active BOOLEAN DEFAULT 0
+            )
+            """
+        )
+        c.execute("SELECT COUNT(*) as cnt FROM test_profiles")
+        if c.fetchone()["cnt"] == 0:
+            c.executemany(
+                """
+                INSERT INTO test_profiles (id, apelido, pasta_sessao, status, ultimo_conectado, phone_number, is_active)
+                VALUES (?, ?, ?, 'DISCONNECTED', NULL, NULL, ?)
+                """,
+                [
+                    ("meu_numero", "Meu número", "/data/auth_session/meu_numero", 1),
+                    ("esposa", "Esposa", "/data/auth_session/esposa", 0),
+                    ("filho", "Filho", "/data/auth_session/filho", 0),
+                    ("bot_estudio", "Bot do Estúdio", "/data/auth_session/bot_estudio", 0),
+                ]
+            )
+            conn.commit()
+        else:
+            # Garante que os caminhos completos /data/auth_session/{id} estejam salvos
+            c.execute("UPDATE test_profiles SET pasta_sessao = '/data/auth_session/' || id WHERE pasta_sessao NOT LIKE '/%'")
+            conn.commit()
+
     conn.close()
+
+
+def get_all_test_profiles():
+    """Retorna todos os 4 perfis de teste cadastrados ordenados."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT * FROM test_profiles 
+        ORDER BY CASE 
+            WHEN id='meu_numero' THEN 1 
+            WHEN id='esposa' THEN 2 
+            WHEN id='filho' THEN 3 
+            ELSE 4 
+        END
+        """
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_active_profile():
+    """Retorna o perfil ativo atual para envio e status no topo."""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM test_profiles WHERE is_active = 1 LIMIT 1")
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return {
+        "id": "meu_numero",
+        "apelido": "Meu número",
+        "pasta_sessao": "/data/auth_session/meu_numero",
+        "status": "DISCONNECTED",
+        "ultimo_conectado": None,
+        "phone_number": None,
+        "is_active": 1,
+    }
+
+
+def sync_profiles_from_gateway():
+    """Consulta o gateway Node na porta 5006 e sincroniza o status de cada perfil no SQLite."""
+    ensure_gateway_running()
+    try:
+        r = requests.get(f"{GATEWAY_URL}/profiles", timeout=2)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("ok") and "profiles" in data:
+                conn = get_db()
+                c = conn.cursor()
+                for pid, pdata in data["profiles"].items():
+                    status = pdata.get("status") or "DISCONNECTED"
+                    phone = pdata.get("connectedNumber")
+                    last_conn = pdata.get("lastConnected")
+                    if last_conn:
+                        c.execute(
+                            "UPDATE test_profiles SET status = ?, phone_number = ?, ultimo_conectado = ? WHERE id = ?",
+                            (status, phone, last_conn, pid)
+                        )
+                    else:
+                        c.execute(
+                            "UPDATE test_profiles SET status = ?, phone_number = ? WHERE id = ?",
+                            (status, phone, pid)
+                        )
+                conn.commit()
+                conn.close()
+                return data["profiles"]
+    except Exception as e:
+        logger.debug("[GATEWAY SYNC] Falha ao sincronizar perfis: %s", e)
+    return {}
 
 
 # ==============================================================================
@@ -1827,18 +1933,185 @@ def build_dashboard_url(studio: dict) -> str:
 # ==============================================================================
 @app.route("/")
 def index_redirect():
-    return redirect("/comecar")
+    return redirect("/conectar")
+
+
+@app.route("/conectar")
+def page_conectar():
+    studio = get_active_studio(request.args.get("studio_id"))
+    sync_profiles_from_gateway()
+    profiles = get_all_test_profiles()
+    active_profile = get_active_profile()
+
+    meta_cloud_info = {
+        "configured": bool(studio.get("access_token") and studio.get("phone_number_id")),
+        "waba_id": studio.get("waba_id") or os.getenv("WHATSAPP_WABA_ID", "Não configurado"),
+        "phone_number_id": studio.get("phone_number_id") or os.getenv("WHATSAPP_PHONE_NUMBER_ID", "Não configurado"),
+        "whatsapp_app_id": WHATSAPP_APP_ID,
+        "mode": os.getenv("USE_PROVIDER", "baileys"),
+        "token_preview": f"{studio.get('access_token')[:10]}...{studio.get('access_token')[-6:]}" if studio.get("access_token") else "Não configurado",
+    }
+
+    return render_template(
+        "conectar.html",
+        studio=studio,
+        profiles=profiles,
+        active_profile=active_profile,
+        dashboard_url=build_dashboard_url(studio),
+        meta_cloud_info=meta_cloud_info,
+    )
+
+
+@app.route("/conectar/<profile_id>")
+def page_conectar_perfil(profile_id: str):
+    studio = get_active_studio(request.args.get("studio_id"))
+    ensure_gateway_running()
+    sync_profiles_from_gateway()
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM test_profiles WHERE id = ?", (profile_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return redirect("/conectar")
+
+    profile = dict(row)
+    active_profile = get_active_profile()
+
+    return render_template(
+        "conectar_perfil.html",
+        studio=studio,
+        profile=profile,
+        active_profile=active_profile,
+        dashboard_url=build_dashboard_url(studio),
+    )
+
+
+@app.route("/api/profiles")
+def api_profiles():
+    sync_profiles_from_gateway()
+    profiles = get_all_test_profiles()
+    active_profile = get_active_profile()
+    return jsonify({
+        "ok": True,
+        "profiles": profiles,
+        "active_profile": active_profile,
+    })
+
+
+@app.route("/api/profiles/<profile_id>/status")
+def api_profile_status(profile_id: str):
+    ensure_gateway_running()
+    try:
+        r = requests.get(f"{GATEWAY_URL}/profiles/{profile_id}/status", timeout=2)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("ok"):
+                conn = get_db()
+                c = conn.cursor()
+                status = data.get("status") or "DISCONNECTED"
+                phone = data.get("connectedNumber")
+                last_conn = data.get("lastConnected")
+                if last_conn:
+                    c.execute(
+                        "UPDATE test_profiles SET status = ?, phone_number = ?, ultimo_conectado = ? WHERE id = ?",
+                        (status, phone, last_conn, profile_id),
+                    )
+                else:
+                    c.execute(
+                        "UPDATE test_profiles SET status = ?, phone_number = ? WHERE id = ?",
+                        (status, phone, profile_id),
+                    )
+                conn.commit()
+                conn.close()
+            return jsonify(data), 200
+    except Exception as e:
+        logger.debug("[API PROFILE STATUS] Erro ao consultar gateway: %s", e)
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM test_profiles WHERE id = ?", (profile_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        p = dict(row)
+        return jsonify({
+            "ok": True,
+            "id": p["id"],
+            "apelido": p["apelido"],
+            "status": p["status"],
+            "qr": None,
+            "connectedNumber": p["phone_number"],
+            "lastConnected": p["ultimo_conectado"],
+        }), 200
+
+    return jsonify({"ok": False, "error": "Perfil não encontrado"}), 404
+
+
+@app.route("/api/profiles/<profile_id>/ativar", methods=["POST"])
+def api_profile_ativar(profile_id: str):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE test_profiles SET is_active = 0")
+    c.execute("UPDATE test_profiles SET is_active = 1 WHERE id = ?", (profile_id,))
+    conn.commit()
+    c.execute("SELECT * FROM test_profiles WHERE id = ?", (profile_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"ok": False, "error": "Perfil não encontrado"}), 404
+    active_profile = dict(row)
+    logger.info("[MULTI-SESSION] Perfil ativo alterado para: %s (%s)", active_profile["apelido"], profile_id)
+    return jsonify({"ok": True, "active_profile": active_profile}), 200
+
+
+@app.route("/api/profiles/<profile_id>/desconectar", methods=["POST"])
+def api_profile_desconectar(profile_id: str):
+    ensure_gateway_running()
+    try:
+        r = requests.post(f"{GATEWAY_URL}/profiles/{profile_id}/disconnect", timeout=4)
+        conn = get_db()
+        conn.execute("UPDATE test_profiles SET status = 'DISCONNECTED', phone_number = NULL WHERE id = ?", (profile_id,))
+        conn.commit()
+        conn.close()
+        if r.status_code == 200:
+            return jsonify(r.json()), 200
+    except Exception as e:
+        auth_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp-gateway", "auth_session", profile_id)
+        if os.path.exists(auth_dir):
+            import shutil
+            shutil.rmtree(auth_dir, ignore_errors=True)
+        conn = get_db()
+        conn.execute("UPDATE test_profiles SET status = 'DISCONNECTED', phone_number = NULL WHERE id = ?", (profile_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "message": "Sessão resetada localmente"}), 200
+    return jsonify({"ok": True}), 200
+
+
+@app.route("/api/profiles/<profile_id>/reconnect", methods=["POST"])
+def api_profile_reconnect(profile_id: str):
+    ensure_gateway_running()
+    try:
+        r = requests.post(f"{GATEWAY_URL}/profiles/{profile_id}/reconnect", timeout=3)
+        return jsonify(r.json()), r.status_code
+    except Exception:
+        return jsonify({"ok": True}), 200
 
 
 @app.route("/comecar")
 def page_comecar():
     studio = get_active_studio(request.args.get("studio_id"))
+    active_profile = get_active_profile()
     return render_template(
         "comecar.html",
         studio=studio,
         whatsapp_app_id=WHATSAPP_APP_ID,
         rota_conexao="/conectar-oficial",
         dashboard_url=build_dashboard_url(studio),
+        active_profile=active_profile,
     )
 
 
@@ -2358,10 +2631,13 @@ def page_dashboard():
 
     conn.close()
 
+    active_profile = get_active_profile()
+
     return render_template(
         "dashboard.html",
         studio=studio,
         dashboard_url=build_dashboard_url(studio),
+        active_profile=active_profile,
         metrics={
             "leads_today": leads_today,
             "booked_count": booked_count,

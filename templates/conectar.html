@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conectar WhatsApp — Multi-Perfil (Baileys) & Produção</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#25D366" />
+  <link rel="icon" type="image/png" href="/static/icon-192.png" />
+  <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --card: #202c33;
+      --green: #25D366;
+      --green-dark: #1ebd5b;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --border: #2a3942;
+      --danger: #ea4335;
+      --warn: #fbbc04;
+      --blue: #60a5fa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; font-weight: 800; font-size: 16px; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    nav a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; }
+    nav a.active, nav a:hover { background: var(--card); color: var(--green); }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* Barra Superior Obrigatória Multi-Sessão */
+    .multi-session-bar {
+      background: #182229;
+      border-bottom: 2px solid var(--green);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 13.5px;
+    }
+    .multi-session-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    /* Abas Principais */
+    .tab-header {
+      display: flex;
+      gap: 10px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 800;
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--card);
+      color: var(--green);
+      border-bottom: 3px solid var(--green);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Cards de Perfis */
+    .profiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .profile-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .profile-card:hover {
+      border-color: var(--green);
+      transform: translateY(-2px);
+    }
+    .profile-card.active-profile {
+      border: 2px solid var(--green);
+      background: linear-gradient(180deg, rgba(37, 211, 102, 0.08) 0%, rgba(32, 44, 51, 1) 100%);
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 800;
+      width: fit-content;
+    }
+    .badge-connected { background: rgba(37, 211, 102, 0.18); color: var(--green); border: 1px solid var(--green); }
+    .badge-disconnected { background: rgba(234, 67, 53, 0.2); color: #ff8a80; border: 1px solid var(--danger); }
+    .badge-scanning { background: rgba(251, 188, 4, 0.2); color: var(--warn); border: 1px solid var(--warn); }
+
+    .btn {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-green { background: var(--green); color: #111b21; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-danger { background: rgba(234, 67, 53, 0.15); border: 1px solid var(--danger); color: #ff8a80; }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA DE STATUS OBRIGATÓRIA NO TOPO -->
+  <div class="multi-session-bar">
+    <div class="multi-session-info">
+      <span style="font-weight: 800; color: #fff;">AMBIENTE: LOCAL | GATEWAY MULTI-SESSÃO</span>
+      <span style="color: var(--muted);">•</span>
+      <span>CONECTADO COMO: <strong style="color: var(--green);" id="topBarActiveName">{{ active_profile.apelido if active_profile else 'Meu número' }}</strong></span>
+      <span style="color: var(--muted);">•</span>
+      <span>PROVIDER: <strong style="color: var(--blue);">baileys</strong></span>
+    </div>
+    <a href="/conectar" class="btn btn-outline" style="border-color: var(--green); color: var(--green); padding: 6px 12px; font-size: 12.5px;">
+      🔄 Trocar quem está conectado
+    </a>
+  </div>
+
+  <header>
+    <a href="/conectar" class="brand">
+      <div class="brand-icon">📸</div>
+      <span>Bot do Studio — Conexão Multi-Perfil</span>
+    </a>
+    <nav>
+      <a href="/conectar" class="active">📲 Central de Conexão</a>
+      <a href="{{ dashboard_url }}">📋 Painel</a>
+      <a href="/configurar-estudio">⚙️ Configurar Estúdio</a>
+      <a href="/instalar">📱 Instalar PWA</a>
+      <a href="/ajuda">❓ Ajuda</a>
+    </nav>
+  </header>
+
+  <main>
+    <div>
+      <h1 style="font-size: 24px; font-weight: 900; color: #fff;">📲 Conexão Multi-Perfil do WhatsApp</h1>
+      <p style="font-size: 14px; color: var(--muted); margin-top: 4px;">
+        Conecte independentemente múltiplos celulares com <strong>1 QR Code por sessão</strong> sem precisar de tokens ou Meta API.
+      </p>
+    </div>
+
+    <!-- NAVEGAÇÃO ENTRE AS 2 ABAS -->
+    <div class="tab-header">
+      <button type="button" class="tab-btn active" id="tabBtnQr" onclick="alternarAbaConectar('qr')">
+        📱 Aba Teste por QR (Baileys Multi-Perfil)
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnCloud" onclick="alternarAbaConectar('cloud')">
+        ☁️ Aba Produção (Meta Cloud API Oficial)
+      </button>
+    </div>
+
+    <!-- ABA 1: TESTE POR QR (BAILEYS MULTI-PERFIL) -->
+    <div class="tab-content active" id="tabContentQr">
+      <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-bottom: 16px;">
+        <strong style="color: #fff; font-size: 15px;">🔒 Isolamento Total de Sessões</strong>
+        <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">
+          Cada um dos 4 perfis abaixo roda em uma pasta estritamente isolada em <code>/data/auth_session/{perfil}</code>. Desconectar ou gerar QR em um celular <strong>jamais afeta os outros celulares</strong>!
+        </p>
+      </div>
+
+      <div class="profiles-grid" id="profilesGrid">
+        {% for p in profiles %}
+          <div class="profile-card {% if p.is_active %}active-profile{% endif %}" id="card-{{ p.id }}">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <h3 style="font-size: 17px; font-weight: 800; color: #fff;">
+                  {% if p.id == 'meu_numero' %}📱 Meu número
+                  {% elif p.id == 'esposa' %}👩 Esposa
+                  {% elif p.id == 'filho' %}👦 Filho
+                  {% else %}🤖 Bot do Estúdio
+                  {% endif %}
+                </h3>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+                  Pasta: <code>auth_session/{{ p.pasta_sessao }}/</code>
+                </div>
+              </div>
+              {% if p.is_active %}
+                <span style="background: var(--green); color: #111b21; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 900;">
+                  ⭐ ATIVO
+                </span>
+              {% endif %}
+            </div>
+
+            <div style="margin: 6px 0;">
+              {% if p.status == 'CONNECTED' %}
+                <span class="badge-status badge-connected" id="badge-{{ p.id }}">
+                  🟢 Conectado (+{{ p.phone_number or 'WhatsApp' }})
+                </span>
+              {% elif p.status == 'SCAN_QR' %}
+                <span class="badge-status badge-scanning" id="badge-{{ p.id }}">
+                  🟡 Aguardando Scan
+                </span>
+              {% else %}
+                <span class="badge-status badge-disconnected" id="badge-{{ p.id }}">
+                  🔴 Desconectado
+                </span>
+              {% endif %}
+            </div>
+
+            <div style="font-size: 12.5px; color: var(--muted);">
+              Última conexão: 
+              <strong style="color: #fff;" id="last-{{ p.id }}">
+                {{ p.ultimo_conectado or 'Ainda não conectado' }}
+              </strong>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+              <a href="/conectar/{{ p.id }}" class="btn btn-green">
+                📲 Conectar / Reconectar
+              </a>
+
+              {% if not p.is_active and p.status == 'CONNECTED' %}
+                <button type="button" class="btn btn-outline" onclick="ativarPerfil('{{ p.id }}')">
+                  ⭐ Usar como Perfil Ativo
+                </button>
+              {% endif %}
+
+              {% if p.status == 'CONNECTED' %}
+                <button type="button" class="btn btn-danger" onclick="desconectarPerfil('{{ p.id }}')">
+                  Desconectar
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ABA 2: PRODUÇÃO (META CLOUD API OFICIAL) -->
+    <div class="tab-content" id="tabContentCloud">
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h2 style="font-size: 18px; font-weight: 800; color: #fff;">☁️ WhatsApp Meta Cloud API (Produção Oficial)</h2>
+            <p style="font-size: 13.5px; color: var(--muted); margin-top: 4px;">
+              Canal oficial certificado pela Meta para disparos em escala no número oficial do estúdio.
+            </p>
+          </div>
+          {% if meta_cloud_info.configured %}
+            <span class="badge-status badge-connected">🟢 CONFIGURADO & ATIVO</span>
+          {% else %}
+            <span class="badge-status badge-disconnected">🟡 NÃO CONFIGURADO (OPCIONAL)</span>
+          {% endif %}
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+          <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px;">
+            <div style="font-size: 12px; color: var(--muted);">WABA ID (WhatsApp Business Account):</div>
+            <div style="font-size: 14.5px; font-weight: 800; color: #fff; margin-top: 3px;">
+              {{ meta_cloud_info.waba_id }}
+            </div>
+          </div>
+
+          <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px;">
+            <div style="font-size: 12px; color: var(--muted);">Phone Number ID:</div>
+            <div style="font-size: 14.5px; font-weight: 800; color: #fff; margin-top: 3px;">
+              {{ meta_cloud_info.phone_number_id }}
+            </div>
+          </div>
+
+          <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px;">
+            <div style="font-size: 12px; color: var(--muted);">Webhook Registrado:</div>
+            <div style="font-size: 14.5px; font-weight: 800; color: var(--green); margin-top: 3px;">
+              POST /webhook (Ativo)
+            </div>
+          </div>
+
+          <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px;">
+            <div style="font-size: 12px; color: var(--muted);">Token de Acesso:</div>
+            <div style="font-size: 14.5px; font-weight: 800; color: #fff; margin-top: 3px;">
+              {{ meta_cloud_info.token_preview }}
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div style="font-size: 13px; color: var(--muted);">
+            Esta aba é 100% isolada e reservada para o número de produção da empresa.
+          </div>
+          <a href="/conectar-oficial" class="btn btn-outline" style="border-color: #60a5fa; color: #60a5fa;">
+            🔗 Conectar via Facebook Login (1 Clique)
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function alternarAbaConectar(aba) {
+      document.getElementById('tabBtnQr').classList.toggle('active', aba === 'qr');
+      document.getElementById('tabBtnCloud').classList.toggle('active', aba === 'cloud');
+      document.getElementById('tabContentQr').classList.toggle('active', aba === 'qr');
+      document.getElementById('tabContentCloud').classList.toggle('active', aba === 'cloud');
+    }
+
+    async function ativarPerfil(profileId) {
+      try {
+        const resp = await fetch(`/api/profiles/${profileId}/ativar`, { method: 'POST' });
+        const data = await resp.json();
+        if (data && data.ok) {
+          window.location.reload();
+        }
+      } catch (e) {
+        alert('Erro ao ativar perfil.');
+      }
+    }
+
+    async function desconectarPerfil(profileId) {
+      if (!confirm(`Deseja realmente desconectar a sessão do perfil '${profileId}'?`)) return;
+      try {
+        const resp = await fetch(`/api/profiles/${profileId}/desconectar`, { method: 'POST' });
+        const data = await resp.json();
+        if (data && data.ok) {
+          window.location.reload();
+        }
+      } catch (e) {
+        alert('Erro ao desconectar perfil.');
+      }
+    }
+
+    // Auto-polling para atualizar status dos cards caso alguém conecte pelo celular
+    async function syncProfilesLive() {
+      try {
+        const resp = await fetch('/api/profiles');
+        const data = await resp.json();
+        if (data && data.ok && data.profiles) {
+          data.profiles.forEach(p => {
+            const badge = document.getElementById(`badge-${p.id}`);
+            const last = document.getElementById(`last-${p.id}`);
+            if (badge) {
+              if (p.status === 'CONNECTED') {
+                badge.className = 'badge-status badge-connected';
+                badge.textContent = `🟢 Conectado (+${p.phone_number || 'WhatsApp'})`;
+              } else if (p.status === 'SCAN_QR') {
+                badge.className = 'badge-status badge-scanning';
+                badge.textContent = '🟡 Aguardando Scan';
+              } else {
+                badge.className = 'badge-status badge-disconnected';
+                badge.textContent = '🔴 Desconectado';
+              }
+            }
+            if (last && p.ultimo_conectado) {
+              last.textContent = p.ultimo_conectado;
+            }
+          });
+          if (data.active_profile) {
+            const topName = document.getElementById('topBarActiveName');
+            if (topName) topName.textContent = data.active_profile.apelido;
+          }
+        }
+      } catch (e) {}
+    }
+
+    setInterval(syncProfilesLive, 3000);
+  </script>
+</body>
+</html>

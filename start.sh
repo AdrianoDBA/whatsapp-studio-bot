@@ -2,6 +2,10 @@
 set -e
 mkdir -p /data
 mkdir -p /data/auth_session
+mkdir -p /data/auth_session/meu_numero
+mkdir -p /data/auth_session/esposa
+mkdir -p /data/auth_session/filho
+mkdir -p /data/auth_session/bot_estudio
 mkdir -p /data/comprovantes
 
 # Se não tem banco no volume, copia o que já tem com 55 slots e 355 msgs

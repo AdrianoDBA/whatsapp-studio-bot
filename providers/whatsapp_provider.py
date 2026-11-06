@@ -33,14 +33,17 @@ class BaileysProvider(WhatsAppProvider):
         clean = str(to or "").split("@")[0]
         return clean in self.test_numbers
 
-    def send_text(self, to: str, text: str) -> bool:
+    def send_text(self, to: str, text: str, profile: Optional[str] = None) -> bool:
         if not to or self._is_test_number(to):
             logger.debug("[BaileysProvider] Ignorando envio para número de teste ou vazio: %s", to)
             return True
         try:
+            payload = {"to": to, "text": text}
+            if profile:
+                payload["profile"] = profile
             resp = requests.post(
                 f"{self.gateway_url}/send",
-                json={"to": to, "text": text},
+                json=payload,
                 timeout=5,
             )
             return resp.status_code in (200, 201)
@@ -48,18 +51,21 @@ class BaileysProvider(WhatsAppProvider):
             logger.warning("[BaileysProvider] Falha ao enviar texto: %s", e)
             return False
 
-    def send_template(self, to: str, template: str, params: Optional[List[Any]] = None) -> bool:
+    def send_template(self, to: str, template: str, params: Optional[List[Any]] = None, profile: Optional[str] = None) -> bool:
         # Baileys não suporta templates Meta diretamente; fallback enviando texto interpolado
         text_body = f"[{template}] " + " ".join(str(p) for p in (params or []))
-        return self.send_text(to, text_body)
+        return self.send_text(to, text_body, profile=profile)
 
-    def send_image(self, to: str, image_url: str, caption: Optional[str] = None) -> bool:
+    def send_image(self, to: str, image_url: str, caption: Optional[str] = None, profile: Optional[str] = None) -> bool:
         if not to or self._is_test_number(to):
             return True
         try:
+            payload = {"to": to, "imageUrl": image_url, "caption": caption or ""}
+            if profile:
+                payload["profile"] = profile
             resp = requests.post(
                 f"{self.gateway_url}/send",
-                json={"to": to, "imageUrl": image_url, "caption": caption or ""},
+                json=payload,
                 timeout=8,
             )
             return resp.status_code in (200, 201)

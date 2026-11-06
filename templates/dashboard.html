@@ -432,7 +432,8 @@
       <span>Bot do Studio</span>
     </a>
     <nav>
-      <a href="/comecar">📲 Conectar meu WhatsApp</a>
+      <a href="/comecar">🚀 Começar</a>
+      <a href="/conectar">📱 Conexões</a>
       <a href="/painel?acesso={{ studio.dashboard_chave.replace('token', 'chave') if studio.dashboard_chave else '' }}" class="active">📋 Painel</a>
       <a href="/configurar-estudio?acesso={{ studio.dashboard_chave.replace('token', 'chave') if studio.dashboard_chave else '' }}">⚙️ Configurar Estúdio</a>
       <a href="/instalar">📱 Instalar App</a>
@@ -440,6 +441,20 @@
       <a href="/privacidade">🔒 Privacidade</a>
     </nav>
   </header>
+
+  <!-- BARRA DE STATUS OBRIGATÓRIA NO TOPO -->
+  <div style="background: #182229; border-bottom: 2px solid var(--green); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 13.5px;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <span style="font-weight: 800; color: #fff;">AMBIENTE: LOCAL | GATEWAY MULTI-SESSÃO</span>
+      <span style="color: var(--muted);">•</span>
+      <span>CONECTADO COMO: <strong style="color: var(--green);">{{ active_profile.apelido if active_profile else 'Meu número' }}</strong></span>
+      <span style="color: var(--muted);">•</span>
+      <span>PROVIDER: <strong style="color: #60a5fa;">baileys</strong></span>
+    </div>
+    <a href="/conectar" style="padding: 6px 14px; font-size: 12.5px; border: 1px solid var(--green); color: var(--green); text-decoration: none; border-radius: 8px; font-weight: 700; background: transparent;">
+      🔄 Trocar quem está conectado
+    </a>
+  </div>
 
   <main>
     <!-- Barra Superior de Identidade e Status -->
