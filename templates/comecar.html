@@ -339,38 +339,8 @@
         window.location.href = DASHBOARD_URL;
         return;
       }
-
-      const btn = document.getElementById('btnConnect');
-      if (btn) btn.textContent = 'CONECTANDO SEU WHATSAPP...';
-
-      // Ativa o bot
-      try {
-        await fetch('/bot/ativar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studio_id: STUDIO_ID, paused: false, status: 'ACTIVE' })
-        });
-      } catch (e) {}
-
-      // Tenta fluxo oficial se disponível
-      if (window.ENABLE_FB_LOGIN && window.FB && typeof window.FB.login === 'function') {
-        try {
-          window.FB.login(function(response) {
-            if (response && response.authResponse) {
-              const codigoAutorizacao = response.authResponse.code || 'one_click_connected';
-              window.location.href = ROTA_CONEXAO_OFICIAL + '?code=' + encodeURIComponent(codigoAutorizacao) + '&studio_id=' + encodeURIComponent(STUDIO_ID);
-            } else {
-              abrirConexaoDireta();
-            }
-          }, {
-            scope: 'business_management,whatsapp_business_management,instagram_basic,instagram_content_publish',
-            response_type: 'code'
-          });
-          return;
-        } catch (err) {}
-      }
-
-      await abrirConexaoDireta();
+      // Redireciona diretamente para a central multi-perfil
+      window.location.href = '/conectar';
     }
 
     async function atualizarEstadoModal() {

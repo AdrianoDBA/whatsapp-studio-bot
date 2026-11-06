@@ -11,6 +11,7 @@ import hashlib
 import logging
 import secrets
 import threading
+import subprocess
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -3898,15 +3899,19 @@ def ensure_gateway_running():
         if os.path.exists(gateway_file):
             try:
                 logger.info("[GATEWAY WATCHDOG] Iniciando whatsapp-gateway na porta 5006 em background...")
+                logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+                os.makedirs(logs_dir, exist_ok=True)
+                log_file = os.path.join(logs_dir, "gateway.log")
+                log_out = open(log_file, "a")
                 _gateway_process = subprocess.Popen(
                     ["node", "gateway.js"],
                     cwd=gateway_dir,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=log_out,
+                    stderr=log_out,
                     start_new_session=True
                 )
-                time.sleep(1.5)
-                r = requests.get(f"{GATEWAY_URL}/status", timeout=2)
+                time.sleep(2.0)
+                r = requests.get(f"{GATEWAY_URL}/status", timeout=3)
                 return r.status_code == 200
             except Exception as e:
                 logger.error("[GATEWAY WATCHDOG] Falha ao iniciar processo do gateway: %s", e)
