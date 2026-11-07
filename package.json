@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "iniciar": "./iniciar.sh",
+    "configurar": "node scripts/configurar.mjs",
     "build": "next build",
     "start": "next start",
     "migrate": "node scripts/migrate.mjs",
