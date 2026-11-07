@@ -524,6 +524,12 @@
       <button type="button" class="tab-btn" id="tabBtnStudio" onclick="mudarAba('studio')">
         📸 Meu Estúdio
       </button>
+      <button type="button" class="tab-btn" id="tabBtnAgentbuilder" onclick="mudarAba('agentbuilder')">
+        🤖 Construtor de Agente
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnRag" onclick="mudarAba('rag')">
+        📚 Base RAG
+      </button>
       <button type="button" class="tab-btn" id="tabBtnIg" onclick="mudarAba('ig')" style="margin-left: auto;">
         📷 Instagram
         {% if metrics.ig_waiting_count %}
@@ -1180,6 +1186,121 @@
         </div>
       </div>
     </div>
+
+    <!-- ABA CONSTRUTOR DE AGENTE (NO-CODE) -->
+    <div class="tab-pane" id="paneAgentbuilder">
+      <div class="card" style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="font-size: 20px; font-weight: 800; color: #fff;">🤖 Construtor de Agente (No-Code)</h2>
+            <p style="font-size: 13.5px; color: var(--muted); margin-top: 4px;">
+              Personalize a identidade da secretária virtual, personalidade, modelo de IA e instruções de atendimento.
+            </p>
+          </div>
+          <span class="badge-status badge-active">● MULTI-AGENT SUPERVISOR ATIVO</span>
+        </div>
+
+        <form id="formAgentConfig" onsubmit="salvarConfigAgente(event)" style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 6px;">
+                Nome da Secretária / Agente
+              </label>
+              <input type="text" id="cfgAgentName" class="search-input" value="Bruna" style="width: 100%; box-sizing: border-box;" required />
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 6px;">
+                Modelo de Inteligência Artificial
+              </label>
+              <select id="cfgModelName" class="search-input" style="width: 100%; box-sizing: border-box; background: var(--panel);">
+                <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Free Tier — 15 RPM / 1.500 dia)</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Raciocínio Complexo)</option>
+                <option value="gpt-4o-mini">OpenAI GPT-4o Mini (Fallback)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 6px;">
+                Temperatura de Criatividade (0.0 a 1.0)
+              </label>
+              <input type="number" id="cfgTemperature" class="search-input" min="0" max="1" step="0.1" value="0.4" style="width: 100%; box-sizing: border-box;" />
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 6px;">
+                Especialidades de Atendimento
+              </label>
+              <input type="text" id="cfgSpecialties" class="search-input" value="Casamentos, Gestantes, Família, Eventos Sociais" style="width: 100%; box-sizing: border-box;" />
+            </div>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 6px;">
+              Personalidade e Tom de Voz da Secretária
+            </label>
+            <textarea id="cfgPersonality" style="width: 100%; box-sizing: border-box; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; color: #fff; padding: 12px; font-size: 14px; min-height: 85px; resize: vertical;">Consultora comercial acolhedora, objetiva e transparente. Nunca inventa preços ou disponibilidade. Responde dúvidas com clareza, qualifica o cliente e chama para agendar reunião.</textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 6px;">
+            <button type="submit" class="btn btn-primary" id="btnSalvarAgentConfig">
+              💾 Salvar Configurações do Agente
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ABA BASE DE CONHECIMENTO RAG -->
+    <div class="tab-pane" id="paneRag">
+      <div class="card" style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="font-size: 20px; font-weight: 800; color: #fff;">📚 Base de Conhecimento RAG (PDF & Manuais)</h2>
+            <p style="font-size: 13.5px; color: var(--muted); margin-top: 4px;">
+              Documentos oficiais utilizados pelo agente para responder perguntas com 100% de exatidão e sem alucinações.
+            </p>
+          </div>
+          <span class="badge-status" style="background: rgba(96, 165, 250, 0.2); color: #60a5fa; border: 1px solid #60a5fa;">
+            🔍 RAG HÍBRIDO ATIVO
+          </span>
+        </div>
+
+        <!-- Ingestão de Documento / PDF -->
+        <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+          <h3 style="font-size: 16px; color: #fff; margin-bottom: 12px;">➕ Ingerir Novo Documento na Base</h3>
+          <form id="formRagIngest" onsubmit="executarIngestaoRag(event)" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+              <input type="text" id="ragDocTitle" class="search-input" placeholder="Título do documento (ex: Manual de Prazos e Entregas)" required />
+              <select id="ragDocCategory" class="search-input" style="background: var(--card);">
+                <option value="Pacotes e Preços">Pacotes e Preços</option>
+                <option value="Políticas e Contratos" selected>Políticas e Contratos</option>
+                <option value="Prazos e Entregas">Prazos e Entregas</option>
+                <option value="FAQ e Dúvidas">FAQ e Dúvidas</option>
+              </select>
+            </div>
+            <textarea id="ragDocContent" style="width: 100%; box-sizing: border-box; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: #fff; padding: 12px; font-size: 13.5px; min-height: 90px; resize: vertical;" placeholder="Cole aqui o texto ou conteúdo do documento para indexação semântica..." required></textarea>
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="submit" class="btn btn-primary" id="btnIngerirRag">
+                ⚡ Ingerir e Indexar na Base
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Teste de Busca Semântica -->
+        <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+          <h3 style="font-size: 16px; color: #fff; margin-bottom: 12px;">🔎 Testar Busca Semântica (Simulador RAG)</h3>
+          <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+            <input type="text" id="ragSearchQuery" class="search-input" style="flex: 1;" placeholder="Ex: Qual o prazo de entrega das fotos tratadas?" />
+            <button type="button" class="btn btn-green" onclick="testarBuscaRag()">Buscar Trechos</button>
+          </div>
+          <div id="ragSearchResults" style="font-size: 13.5px; color: var(--muted);">
+            Digite uma pergunta para simular a recuperação do especialista.
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- MODAL DE POSTAGEM DE PRÉVIAS NO INSTAGRAM -->
@@ -1285,7 +1406,7 @@
       if (aba === 'kanban') {
         aba = 'agendamentos';
       }
-      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente', 'previas'];
+      const abas = ['conversas', 'agendamentos', 'pacotes', 'studio', 'ig', 'expediente', 'previas', 'agentbuilder', 'rag'];
       abas.forEach(a => {
         const btn = document.getElementById('tabBtn' + a.charAt(0).toUpperCase() + a.slice(1));
         const pane = document.getElementById('pane' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -1297,6 +1418,117 @@
         carregarKanban();
       } else if (aba === 'previas') {
         carregarPreviasDinamico();
+      } else if (aba === 'agentbuilder') {
+        carregarConfigAgente();
+      }
+    }
+
+    async function carregarConfigAgente() {
+      try {
+        const res = await fetch(`/api/photoagent/agent/config?tenant_id=${STUDIO_ID}`);
+        const data = await res.json();
+        if (data.ok && data.config) {
+          const cfg = data.config;
+          if (cfg.agent_name) document.getElementById('cfgAgentName').value = cfg.agent_name;
+          if (cfg.personality) document.getElementById('cfgPersonality').value = cfg.personality;
+          if (cfg.model_name) document.getElementById('cfgModelName').value = cfg.model_name;
+          if (cfg.temperature) document.getElementById('cfgTemperature').value = cfg.temperature;
+          if (cfg.specialties) document.getElementById('cfgSpecialties').value = cfg.specialties;
+        }
+      } catch (e) {
+        console.error("Erro ao carregar config do agente:", e);
+      }
+    }
+
+    async function salvarConfigAgente(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSalvarAgentConfig');
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+      try {
+        const res = await fetch('/api/photoagent/agent/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant_id: STUDIO_ID,
+            agent_name: document.getElementById('cfgAgentName').value,
+            personality: document.getElementById('cfgPersonality').value,
+            model_name: document.getElementById('cfgModelName').value,
+            temperature: parseFloat(document.getElementById('cfgTemperature').value) || 0.4,
+            specialties: document.getElementById('cfgSpecialties').value
+          })
+        });
+        const d = await res.json();
+        if (d.ok) {
+          mostrarToast("Configurações do agente salvas com sucesso!");
+        } else {
+          alert("Erro ao salvar configurações.");
+        }
+      } catch (err) {
+        alert("Erro na requisição.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Salvar Configurações do Agente';
+      }
+    }
+
+    async function executarIngestaoRag(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnIngerirRag');
+      btn.disabled = true;
+      btn.textContent = 'Indexando...';
+      try {
+        const res = await fetch('/api/photoagent/rag/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenant_id: STUDIO_ID,
+            title: document.getElementById('ragDocTitle').value,
+            category: document.getElementById('ragDocCategory').value,
+            content: document.getElementById('ragDocContent').value
+          })
+        });
+        const d = await res.json();
+        if (d.ok) {
+          mostrarToast("Documento indexado na base RAG com sucesso!");
+          document.getElementById('ragDocTitle').value = '';
+          document.getElementById('ragDocContent').value = '';
+        } else {
+          alert("Erro ao indexar documento.");
+        }
+      } catch (err) {
+        alert("Erro na requisição.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Ingerir e Indexar na Base';
+      }
+    }
+
+    async function testarBuscaRag() {
+      const q = document.getElementById('ragSearchQuery').value.trim();
+      const container = document.getElementById('ragSearchResults');
+      if (!q) return;
+      container.innerHTML = "<em>Pesquisando na base vetorial e léxica...</em>";
+      try {
+        const res = await fetch(`/api/photoagent/rag/search?tenant_id=${STUDIO_ID}&q=${encodeURIComponent(q)}`);
+        const d = await res.json();
+        if (d.ok && d.results && d.results.length > 0) {
+          let html = `<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">`;
+          d.results.forEach(r => {
+            html += `
+              <div style="background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+                <div style="font-weight: 800; color: var(--green); font-size: 13px;">[${r.category}] ${r.title}</div>
+                <div style="margin-top: 4px; color: #fff; font-size: 13px;">${r.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+          container.innerHTML = html;
+        } else {
+          container.innerHTML = "<span style='color: var(--warn);'>Nenhum trecho relevante encontrado para esta busca.</span>";
+        }
+      } catch (e) {
+        container.innerHTML = "<span style='color: var(--danger);'>Erro ao executar busca RAG.</span>";
       }
     }
 

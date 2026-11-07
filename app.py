@@ -582,6 +582,15 @@ def init_db():
             c.execute("UPDATE test_profiles SET pasta_sessao = '/data/auth_session/' || id WHERE pasta_sessao NOT LIKE '/%'")
             conn.commit()
 
+        # 9. Inicialização do Ecossistema Multi-Tenant PhotoAgent AI 2.0
+        try:
+            from modules.multitenant import init_multitenant_db
+            from modules.rag import seed_default_gustavo_proposal
+            init_multitenant_db(conn)
+            seed_default_gustavo_proposal(conn)
+        except Exception as e:
+            logger.warning("[PHOTOAGENT MULTITENANT INIT] %s", e)
+
     conn.close()
 
 
@@ -2988,6 +2997,176 @@ def api_instagram_previas_pendentes():
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return jsonify({"ok": True, "previas_pendentes": rows, "count": len(rows)})
+
+
+# ==============================================================================
+# PHOTOAGENT AI 2.0 — MULTI-TENANT & MULTI-AGENT ADVANCED PLATFORM APIS
+# ==============================================================================
+
+@app.route("/api/photoagent/kanban", methods=["GET"])
+def api_photoagent_kanban():
+    """Retorna a esteira Kanban oficial de 5 colunas com métricas do CRM."""
+    tenant_id = request.args.get("tenant_id") or "studio-principal"
+    conn = get_db()
+    try:
+        from modules.crm import get_kanban_board_data
+        data = get_kanban_board_data(conn, tenant_id)
+        return jsonify({"ok": True, "board": data})
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/kanban/status", methods=["POST"])
+def api_photoagent_kanban_status():
+    """Atualiza a etapa de um ensaio no Kanban."""
+    payload = request.get_json(silent=True) or {}
+    ensaio_id = payload.get("id")
+    novo_status = payload.get("status")
+    tenant_id = payload.get("tenant_id") or "studio-principal"
+    if not ensaio_id or not novo_status:
+        return jsonify({"ok": False, "error": "id e status são obrigatórios"}), 400
+
+    conn = get_db()
+    try:
+        from modules.crm import update_ensaio_status
+        success = update_ensaio_status(conn, tenant_id, int(ensaio_id), novo_status)
+        return jsonify({"ok": success, "id": ensaio_id, "status": novo_status})
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/tools", methods=["GET"])
+def api_photoagent_tools():
+    """Retorna o esquema de todas as ferramentas tipadas do ecossistema."""
+    from modules.tools import registry
+    return jsonify({"ok": True, "tools": registry.get_schemas()})
+
+
+@app.route("/api/photoagent/tools/execute", methods=["POST"])
+def api_photoagent_tool_execute():
+    """Executa uma ferramenta de forma controlada com tenant isolation e auditoria."""
+    payload = request.get_json(silent=True) or {}
+    tool_name = payload.get("tool_name")
+    args = payload.get("args") or {}
+    tenant_id = payload.get("tenant_id") or "studio-principal"
+    if not tool_name:
+        return jsonify({"ok": False, "error": "tool_name é obrigatório"}), 400
+
+    conn = get_db()
+    try:
+        from modules.tools import registry
+        res = registry.execute(tool_name, conn, tenant_id, args)
+        return jsonify(res), 200 if res.get("ok") else 400
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/rag/search", methods=["GET"])
+def api_photoagent_rag_search():
+    """Consulta semântica/léxica à base de conhecimento oficial do fotógrafo."""
+    q = request.args.get("q") or ""
+    categoria = request.args.get("categoria")
+    tenant_id = request.args.get("tenant_id") or "studio-principal"
+    conn = get_db()
+    try:
+        from modules.rag import search_knowledge_base
+        results = search_knowledge_base(conn, tenant_id, q, categoria)
+        return jsonify({"ok": True, "query": q, "results": results})
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/rag/ingest", methods=["POST"])
+def api_photoagent_rag_ingest():
+    """Ingere novo documento na base RAG do fotógrafo."""
+    payload = request.get_json(silent=True) or {}
+    title = payload.get("title")
+    category = payload.get("category", "Políticas")
+    content = payload.get("content")
+    tenant_id = payload.get("tenant_id") or "studio-principal"
+    if not title or not content:
+        return jsonify({"ok": False, "error": "title e content são obrigatórios"}), 400
+
+    conn = get_db()
+    try:
+        from modules.rag import ingest_document
+        doc_id = ingest_document(conn, tenant_id, title, category, content)
+        return jsonify({"ok": True, "doc_id": doc_id})
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/agent/process", methods=["POST"])
+def api_photoagent_agent_process():
+    """Processa mensagem via SupervisorAgent e especialistas coordenados."""
+    payload = request.get_json(silent=True) or {}
+    phone = payload.get("phone")
+    text = payload.get("text")
+    name = payload.get("name")
+    tenant_id = payload.get("tenant_id") or "studio-principal"
+    if not phone or not text:
+        return jsonify({"ok": False, "error": "phone e text são obrigatórios"}), 400
+
+    conn = get_db()
+    try:
+        from modules.agents import SupervisorAgent
+        supervisor = SupervisorAgent()
+        reply, metadata = supervisor.process_message(conn, tenant_id, phone, text, name)
+        return jsonify({
+            "ok": True,
+            "reply": reply,
+            "metadata": metadata
+        })
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/offline/sync", methods=["POST"])
+def api_photoagent_offline_sync():
+    """Sincroniza lote de operações efetuadas offline pelo PWA/IndexedDB."""
+    payload = request.get_json(silent=True) or {}
+    batch = payload.get("batch") or []
+    tenant_id = payload.get("tenant_id") or "studio-principal"
+    conn = get_db()
+    try:
+        from modules.offline_sync import process_offline_sync_batch
+        res = process_offline_sync_batch(conn, tenant_id, batch)
+        return jsonify(res)
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/tenants", methods=["GET", "POST"])
+def api_photoagent_tenants():
+    """Lista todos os fotógrafos tenants ou cadastra um novo."""
+    conn = get_db()
+    try:
+        from modules.multitenant import list_all_tenants, create_tenant
+        if request.method == "POST":
+            payload = request.get_json(silent=True) or {}
+            tenant = create_tenant(conn, payload)
+            return jsonify({"ok": True, "tenant": tenant}), 201
+        tenants = list_all_tenants(conn)
+        return jsonify({"ok": True, "tenants": tenants})
+    finally:
+        conn.close()
+
+
+@app.route("/api/photoagent/agent/config", methods=["GET", "POST"])
+def api_photoagent_agent_config():
+    """Lê ou atualiza a configuração do agente (construtor no-code) para o tenant."""
+    conn = get_db()
+    try:
+        from modules.multitenant import get_agent_config, update_agent_config
+        tenant_id = request.args.get("tenant_id") or (request.get_json(silent=True) or {}).get("tenant_id") or "studio-principal"
+        if request.method == "POST":
+            payload = request.get_json(silent=True) or {}
+            success = update_agent_config(conn, tenant_id, payload)
+            return jsonify({"ok": success})
+        cfg = get_agent_config(conn, tenant_id)
+        return jsonify({"ok": True, "config": cfg})
+    finally:
+        conn.close()
 
 
 @app.route("/dashboard/status", methods=["POST"])
