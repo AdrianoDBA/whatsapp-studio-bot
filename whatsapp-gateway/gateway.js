@@ -187,6 +187,8 @@ async function startSession(profileId) {
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      console.log(`[GATEWAY UPSERT] profile: ${profileId}, type: ${type}, total: ${messages?.length}`);
+
       for (const m of messages) {
         if (m.key && m.key.id && m.message) {
           saveToRawMessageStore(m.key, m.message);
@@ -200,12 +202,6 @@ async function startSession(profileId) {
 
         const msgId = msg.key.id;
         if (!msgId || processedMsgIds.has(msgId) || botSentMsgIds.has(msgId)) continue;
-
-        const rawTs = Number(msg.messageTimestamp?.low || msg.messageTimestamp || 0);
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (rawTs > 0 && (nowSec - rawTs) > 300) {
-          continue;
-        }
 
         const unwrapped = unwrapMessageContent(msg.message);
         if (!unwrapped) continue;
@@ -228,33 +224,25 @@ async function startSession(profileId) {
         }
 
         const isFromMe = Boolean(msg.key.fromMe);
-        const userJid = session.sock?.user?.id ? session.sock.user.id.split(':')[0] + '@s.whatsapp.net' : '';
-        const isSelfChat = isFromMe && (remoteJid === userJid || remoteJid.startsWith(session.connectedNumber || '___'));
+        const cleanPhone = (session.connectedNumber || '').replace(/\D/g, '');
+        const cleanRemote = remoteJid.replace(/\D/g, '');
+        const last8User = cleanPhone.slice(-8);
+        const last8Remote = cleanRemote.slice(-8);
 
+        // Auto-conversa (teste do usuário com o próprio número)
+        const isSelfChat = isFromMe && (
+          remoteJid.includes(cleanPhone) ||
+          cleanRemote.includes(cleanPhone) ||
+          (Boolean(last8User) && Boolean(last8Remote) && last8User === last8Remote)
+        );
+
+        // Se for mensagem enviada manualmente pelo dono para outros contatos, ignora
         if (isFromMe && !isSelfChat) {
           continue;
         }
 
-        // Anti-loop checks
-        if (
-          recentBotTexts.has(text) ||
-          text.includes('Aqui é a ') ||
-          text.includes('Sou a ') ||
-          text.includes('Tenho estes 3 horários') ||
-          text.includes('Acabei de gerar seu comprovante') ||
-          text.includes('Acabei de te mandar alguns exemplos') ||
-          text.includes('Já chamei o ') ||
-          text.includes('👉 *') ||
-          text.includes('🔔 Novo recado') ||
-          text.includes('Exemplo 1/3') ||
-          text.includes('Exemplo 2/3') ||
-          text.includes('Exemplo 3/3') ||
-          text.includes('tá em edição') ||
-          text.includes('Acabei de avisar') ||
-          text.includes('Posso anotar seu recado') ||
-          text.includes('horário confirmado') ||
-          text.includes('Recebi seu áudio')
-        ) {
+        // Anti-loop
+        if (recentBotTexts.has(text)) {
           continue;
         }
 
@@ -265,7 +253,7 @@ async function startSession(profileId) {
         }
 
         const pushName = msg.pushName || 'Cliente';
-        console.log(`[GATEWAY INCOMING] Perfil: ${profileId} | De: ${remoteJid} (${pushName}) | Texto: "${text}"`);
+        console.log(`[GATEWAY INCOMING] Perfil: ${profileId} | De: ${remoteJid} (${pushName}) | Texto: "${text}" | isSelf: ${isSelfChat}`);
 
         // Forward to Next.js webhook
         try {
@@ -586,16 +574,24 @@ app.post('/session/:id/send', async (req, res) => {
   if (!jid.includes('@')) {
     const cleanPhone = to.replace(/\D/g, '');
     jid = `${cleanPhone}@s.whatsapp.net`;
+  } else {
+    // Normaliza JIDs com sufixo de dispositivo (ex: 553488412981:12@s.whatsapp.net -> 553488412981@s.whatsapp.net)
+    jid = jid.replace(/:[^@]+@/, '@');
   }
+
+  console.log(`[GATEWAY SENDING] Enviando mensagem pelo perfil '${session.id}' para ${jid}: "${text.slice(0, 60)}..."`);
 
   try {
     const sentMsg = await session.sock.sendMessage(jid, { text });
     if (sentMsg?.key?.id) {
       botSentMsgIds.add(sentMsg.key.id);
       processedMsgIds.add(sentMsg.key.id);
+      if (text.trim()) recentBotTexts.add(text.trim());
     }
+    console.log(`[GATEWAY SENT OK] Mensagem enviada com sucesso para ${jid}: ${sentMsg?.key?.id}`);
     res.json({ status: 'ok', msgId: sentMsg?.key?.id });
   } catch (err) {
+    console.error(`[GATEWAY SEND FAILED] Erro ao enviar para ${jid}:`, err.message);
     res.status(500).json({ error: err.message });
   }
 });
