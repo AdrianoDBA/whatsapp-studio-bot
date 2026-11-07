@@ -134,6 +134,7 @@ export function GuiaAtivacaoCliente({
             <div className="pt-3">
               <Button
                 render={<Link href={`/app/${orgSlug}/whatsapp`} />}
+                nativeButton={false}
                 size="sm"
                 variant={isConnected ? "outline" : "default"}
                 className="w-full gap-2 text-xs"
@@ -198,6 +199,7 @@ export function GuiaAtivacaoCliente({
             <div className="pt-3">
               <Button
                 render={<Link href={`/app/${orgSlug}/agentes/atendimento`} />}
+                nativeButton={false}
                 size="sm"
                 variant={isConfigured ? "outline" : "default"}
                 className="w-full gap-2 text-xs"
