@@ -11,20 +11,25 @@ echo "   🚀 INICIANDO ATENDEAI — SAAS COM WHATSAPP & IA"
 echo "=========================================================="
 echo ""
 
-# 1. Garante que .env.local existe com a chave de criptografia gerada
+# 1. Garante que .env.local existe com as credenciais locais do Supabase
 if [ ! -f "$DIR/.env.local" ]; then
-  echo "⚙️ Configurando .env.local inicial automaticamente..."
-  if [ -f "$DIR/.env.example" ]; then
-    cp "$DIR/.env.example" "$DIR/.env.local"
-  fi
-  # Gera chave de criptografia de 32 bytes
-  ENC_KEY=$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64'))")
-  sed -i '' "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$ENC_KEY|" "$DIR/.env.local" 2>/dev/null || \
-  sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$ENC_KEY|" "$DIR/.env.local" 2>/dev/null || true
-  echo "🔑 Chave de criptografia configurada!"
+  echo "⚙️ Configurando .env.local com Supabase local..."
+  cat << 'EOF' > "$DIR/.env.local"
+SUPABASE_URL=http://127.0.0.1:44321
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:44322/postgres
+ENCRYPTION_KEY=D41FrgAsSo6/jC3Ow47Fa9KT/UgRDMeKaEzKhpN5ft0=
+WHATSAPP_GATEWAY_URL=http://127.0.0.1:5006
+EOF
 fi
 
-# 2. Limpa processos antigos nas portas 3000 e 5006
+# 2. Confere se o Supabase local está ativo
+if ! npx supabase status >/dev/null 2>&1; then
+  echo "🐘 Iniciando banco de dados e autenticação local (Supabase)..."
+  npx supabase start >/dev/null 2>&1 || true
+fi
+
+# 3. Limpa processos antigos nas portas 3000 e 5006
 echo "🧹 [1/3] Liberando portas 3000 (Web App) e 5006 (WhatsApp Gateway)..."
 lsof -ti :3000 -ti :5006 | xargs kill -9 2>/dev/null || true
 pkill -f "node.*gateway.js" 2>/dev/null || true

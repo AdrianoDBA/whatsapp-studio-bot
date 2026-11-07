@@ -49,5 +49,5 @@ create policy "members read whatsapp instances"
 drop policy if exists "admins manage whatsapp instances" on public.whatsapp_instances;
 create policy "admins manage whatsapp instances"
   on public.whatsapp_instances for all
-  using (public.has_org_role(organization_id, 'admin') or public.has_org_role(organization_id, 'owner'))
-  with check (public.has_org_role(organization_id, 'admin') or public.has_org_role(organization_id, 'owner'));
+  using (public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[]))
+  with check (public.has_org_role(organization_id, array['owner', 'admin']::public.org_role[]));
