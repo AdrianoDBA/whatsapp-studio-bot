@@ -329,15 +329,15 @@ app.get('/profiles/:profile/status', (req, res) => {
 
 // Backward compatibility with legacy /status
 app.get('/status', (req, res) => {
-  const targetProfile = req.query.profile || 'meu_numero';
-  const s = SESSIONS[targetProfile] || SESSIONS.meu_numero;
+  const targetProfile = req.query.profile || 'default';
+  const s = SESSIONS[targetProfile] || getOrCreateSession(targetProfile);
   res.json({
-    status: s.status,
-    qr: s.qr,
-    connectedNumber: s.connectedNumber,
+    status: s.status || 'DISCONNECTED',
+    qr: s.qr || null,
+    connectedNumber: s.connectedNumber || null,
     profile: s.id,
-    apelido: s.apelido,
-    lastConnected: s.lastConnected
+    apelido: s.apelido || s.id,
+    lastConnected: s.lastConnected || null
   });
 });
 
