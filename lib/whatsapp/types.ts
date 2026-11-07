@@ -8,6 +8,7 @@ export type WhatsAppInstance = {
   instance_name: string | null;
   provider: WhatsAppProvider;
   status: WhatsAppStatus;
+  bot_enabled: boolean;
   qr_code: string | null;
   cloud_phone_number_id: string | null;
   cloud_waba_id: string | null;

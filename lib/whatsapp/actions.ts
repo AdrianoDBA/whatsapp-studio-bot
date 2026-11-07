@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireOrgRole } from "@/lib/auth/guards";
+import { systemPool } from "@/lib/automation/pg";
 import { logError } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 
@@ -228,5 +229,50 @@ export async function salvarCloudApiAction({
   } catch (e: any) {
     logError("whatsapp.salvarCloudApiAction", e);
     return { ok: false, error: e.message || "Falha ao configurar Meta Cloud API." };
+  }
+}
+
+/**
+ * Liga ou desliga as respostas automáticas da inteligência artificial no WhatsApp.
+ */
+export async function alternarBotAction({
+  orgSlug,
+  enabled,
+}: {
+  orgSlug: string;
+  enabled: boolean;
+}): Promise<ActionResult<{ enabled: boolean }>> {
+  try {
+    const { org } = await requireOrgRole({ orgSlug, roles: ["owner", "admin"] });
+    const supabase = await createClient();
+
+    // 1. Atualiza na tabela whatsapp_instances
+    const { error: instErr } = await supabase
+      .from("whatsapp_instances")
+      .update({ bot_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq("organization_id", org.id);
+
+    if (instErr) {
+      logError("whatsapp.alternarBot.instance", instErr);
+    }
+
+    // 2. Atualiza no config do agente de atendimento
+    const pool = systemPool();
+    await pool.query(
+      `UPDATE public.agents
+       SET config = jsonb_set(coalesce(config, '{}'::jsonb), '{botActive}', $1::jsonb),
+           updated_at = now()
+       WHERE organization_id = $2 AND slug = 'atendimento'`,
+      [JSON.stringify(enabled), org.id],
+    );
+
+    revalidatePath(`/app/${orgSlug}/whatsapp`);
+    revalidatePath(`/app/${orgSlug}/agentes/atendimento`);
+    revalidatePath(`/app/${orgSlug}/dashboard`);
+
+    return { ok: true, data: { enabled } };
+  } catch (e: any) {
+    logError("whatsapp.alternarBotAction", e);
+    return { ok: false, error: e.message || "Erro ao alterar status do bot." };
   }
 }

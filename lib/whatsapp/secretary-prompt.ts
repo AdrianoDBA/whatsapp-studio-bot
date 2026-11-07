@@ -9,6 +9,7 @@ export type SecretaryConfig = {
   paymentMethods: string;
   humanHandoff: string;
   additionalNotes: string;
+  botActive?: boolean;
 };
 
 export const TONE_OPTIONS: Array<{

@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BotToggle } from "@/components/whatsapp/bot-toggle";
 import type { SecretaryConfig } from "@/lib/whatsapp/secretary-prompt";
 import type { WhatsAppStatus } from "@/lib/whatsapp/types";
 
@@ -57,10 +58,11 @@ export function GuiaAtivacaoCliente({
             </CardDescription>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <BotToggle orgSlug={orgSlug} initialEnabled={agentConfig?.botActive ?? true} variant="compact" />
             <div className="text-right">
               <span className="text-xs font-semibold text-foreground">
-                Progresso: {totalFeito}/2 Concluídos
+                Progresso: {totalFeito}/2
               </span>
             </div>
             <div className="h-2 w-20 rounded-full bg-muted overflow-hidden">

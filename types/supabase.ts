@@ -1219,6 +1219,7 @@ export type Database = {
       };
       whatsapp_instances: {
         Row: {
+          bot_enabled: boolean;
           cloud_access_token: string | null;
           cloud_phone_number_id: string | null;
           cloud_waba_id: string | null;
@@ -1235,6 +1236,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          bot_enabled?: boolean;
           cloud_access_token?: string | null;
           cloud_phone_number_id?: string | null;
           cloud_waba_id?: string | null;
@@ -1251,6 +1253,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          bot_enabled?: boolean;
           cloud_access_token?: string | null;
           cloud_phone_number_id?: string | null;
           cloud_waba_id?: string | null;

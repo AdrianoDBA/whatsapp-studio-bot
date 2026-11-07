@@ -86,6 +86,16 @@ export async function POST(req: Request) {
           }
         }
 
+        // 1.1 Verifica se o bot de atendimento está ligado para esta organização
+        const instRes = await pool.query(
+          `SELECT bot_enabled FROM public.whatsapp_instances WHERE organization_id = $1 LIMIT 1`,
+          [orgId],
+        );
+        if (instRes.rows.length > 0 && instRes.rows[0].bot_enabled === false) {
+          console.log(`[webhook/whatsapp] Bot desligado na instância (org=${orgId}, ${orgName}). Mensagem ignorada.`);
+          return;
+        }
+
         // 2. Localiza o Agente de Atendimento
         const agentRes = await pool.query(
           `SELECT id, slug, name, system_prompt, model, tools, config
@@ -98,6 +108,11 @@ export async function POST(req: Request) {
 
         const agent = agentRes.rows[0];
         const cfg = agent?.config || {};
+
+        if (cfg.botActive === false || cfg.enabled === false) {
+          console.log(`[webhook/whatsapp] Bot desligado na configuração da secretária (org=${orgId}). Mensagem ignorada.`);
+          return;
+        }
         const nomeAssistente = cfg.assistantName || "assistente virtual";
         const nomeEmpresa = cfg.companyName || orgName;
 

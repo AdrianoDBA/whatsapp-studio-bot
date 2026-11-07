@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BotToggle } from "@/components/whatsapp/bot-toggle";
 import {
   consultarStatusWhatsAppAction,
   desconectarWhatsAppAction,
@@ -59,6 +60,7 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
                 instance_name: "Principal",
                 provider: "baileys",
                 status: "connected",
+                bot_enabled: true,
                 qr_code: null,
                 phone_number: res.data?.phoneNumber || null,
                 cloud_phone_number_id: null,
@@ -201,7 +203,8 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
               Associe o número de celular da sua empresa ao Agente de Atendimento inteligente.
             </CardDescription>
           </div>
-          <div>
+          <div className="flex items-center gap-2">
+            <BotToggle orgSlug={orgSlug} initialEnabled={instance?.bot_enabled ?? true} variant="compact" />
             {isConnected ? (
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 flex items-center gap-1.5 py-1 px-3">
                 <CheckCircle2Icon className="h-4 w-4" />
@@ -247,6 +250,9 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Controle de Ligar / Desligar Bot de Atendimento */}
+      <BotToggle orgSlug={orgSlug} initialEnabled={instance?.bot_enabled ?? true} variant="card" />
 
       {/* Atalho para Personalização da Secretária */}
       <Card className="border-primary/30 bg-primary/5">

@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BotToggle } from "@/components/whatsapp/bot-toggle";
 import {
   TONE_OPTIONS,
   buildSecretaryPrompt,
@@ -134,7 +135,15 @@ export function SecretaryCustomizer({
   }
 
   return (
-    <Card className="overflow-hidden border-border/80 shadow-sm">
+    <div className="space-y-4">
+      {/* Controle de Ligar / Desligar Bot */}
+      <BotToggle
+        orgSlug={orgSlug}
+        initialEnabled={initialConfig?.botActive ?? true}
+        variant="card"
+      />
+
+      <Card className="overflow-hidden border-border/80 shadow-sm">
       <CardHeader className="border-b border-border/60 bg-muted/20 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
@@ -459,5 +468,6 @@ export function SecretaryCustomizer({
         </Tabs>
       </CardContent>
     </Card>
+    </div>
   );
 }

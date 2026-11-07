@@ -19,6 +19,7 @@ const secretaryConfigSchema = z.object({
   humanHandoff: z.string().max(1000, "Regra de transbordo muito longa (máximo 1.000 caracteres)"),
   additionalNotes: z.string().max(3000, "Observações muito longas (máximo 3.000 caracteres)"),
   directPrompt: z.string().max(18000, "Prompt muito longo").optional(),
+  botActive: z.boolean().optional(),
 });
 
 export type SalvarConfiguracaoInput = z.infer<typeof secretaryConfigSchema>;
@@ -77,6 +78,7 @@ export async function salvarConfiguracaoSecretariaAction(
       paymentMethods: parsed.data.paymentMethods.trim(),
       humanHandoff: parsed.data.humanHandoff.trim(),
       additionalNotes: parsed.data.additionalNotes.trim(),
+      botActive: parsed.data.botActive ?? currentAgent.config?.botActive ?? true,
     };
 
     // Compila o prompt novo (ou usa o prompt direto se o usuário editou na aba avançada)
@@ -104,6 +106,14 @@ export async function salvarConfiguracaoSecretariaAction(
         currentAgent.id,
         org.id,
       ],
+    );
+
+    // Sincroniza também com whatsapp_instances
+    await pool.query(
+      `UPDATE public.whatsapp_instances
+       SET bot_enabled = $1, updated_at = now()
+       WHERE organization_id = $2`,
+      [config.botActive, org.id],
     );
 
     // 3. Revalida as páginas do workspace

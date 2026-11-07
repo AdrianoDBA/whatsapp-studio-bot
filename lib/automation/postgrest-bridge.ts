@@ -415,6 +415,7 @@ export const COLUNAS_DA_PONTE = {
     "window_started_at",
   ],
   whatsapp_instances: [
+    "bot_enabled",
     "cloud_access_token",
     "cloud_phone_number_id",
     "cloud_waba_id",
