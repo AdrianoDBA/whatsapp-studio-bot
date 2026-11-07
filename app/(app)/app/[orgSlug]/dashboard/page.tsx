@@ -225,10 +225,8 @@ export default async function DashboardPage({ params }: Props) {
               esta tela é sua
             </p>
             <p className="text-sm leading-relaxed">
-              Os números acima saem de consultas de verdade, em{" "}
-              <code className="font-mono text-xs">lib/dashboard/queries.ts</code>. Quer outro número
-              aqui — quantos clientes você atendeu, quanto vendeu no mês? Abra o Claude Code e peça
-              em português.
+              Os números acima refletem a atividade real da sua empresa no WhatsApp, detalhando atendimentos
+              e métricas do seu assistente de inteligência artificial.
             </p>
           </div>
         </div>

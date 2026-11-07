@@ -16,7 +16,7 @@ export function AgentsTable({ orgSlug, agents }: { orgSlug: string; agents: Agen
         <EmptyState
           icon={BotIcon}
           title="Nenhum agente ainda"
-          description="Peça pro Claude Code criar um agente. Workspace novo já nasce com ele; este aqui recebe no próximo deploy — ou rode npm run semear agora, sem esperar."
+          description="Nenhum agente cadastrado para este workspace no momento."
         />
       }
     />

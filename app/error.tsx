@@ -21,8 +21,7 @@ export default function AppError({
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
       <h2 className="font-semibold text-2xl">Algo deu errado</h2>
       <p className="max-w-md text-muted-foreground text-sm">
-        Tente de novo. Se continuar, copie o código abaixo e mande pro Claude Code contando o que
-        você estava fazendo.
+        Tente de novo. Se o problema persistir, entre em contato com o suporte técnico informando o código abaixo.
       </p>
       {error.digest && (
         <div className="space-y-1">

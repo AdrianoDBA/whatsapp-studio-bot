@@ -38,11 +38,8 @@ export default async function ConhecimentoPage({ params }: Props) {
         <span className="label-mono">/ conhecimento</span>
         <h1 className="font-semibold text-3xl tracking-tight">Conhecimento</h1>
         <p className="max-w-2xl text-muted-foreground text-sm">
-          Suba os seus documentos e o agente passa a responder com eles: manual, contrato, política,
-          tabela de preços. Ele procura os trechos que falam da pergunta e cita de onde tirou. As
-          bases nascem do código: peça pro Claude Code declarar uma. Um workspace novo já nasce com
-          ela; este workspace, que já existe, recebe no próximo deploy — ou rode npm run semear
-          agora, sem esperar.
+          Suba os seus documentos e o agente passa a responder com eles: manuais, contratos, políticas
+          e catálogos de produtos. Ele procura os trechos relevantes e responde com precisão.
         </p>
       </div>
 
@@ -57,8 +54,7 @@ export default async function ConhecimentoPage({ params }: Props) {
       <BasesTable orgSlug={orgSlug} bases={bases} />
 
       <p className="text-muted-foreground text-xs">
-        Pra um agente usar isto, peça pro Claude Code marcar a ferramenta{" "}
-        <span className="font-medium">Buscar na base de conhecimento</span> na planta dele.
+        Para a assistente usar seus documentos, mantenha a ferramenta de busca de conhecimento ativa.
       </p>
     </div>
   );

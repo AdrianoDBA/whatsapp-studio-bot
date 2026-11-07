@@ -7,29 +7,6 @@
  * formulário. Quando um workspace é criado, `materializarWorkspace` lê estas
  * quatro listas e grava as linhas correspondentes. Pra workspaces que já
  * existem, `npm run semear` faz o mesmo.
- *
- * Workspace novo já materializa sozinho: `createOrganizationAction` chama
- * `materializarWorkspace` logo depois da RPC de criação. Pra workspace que já
- * existe, `npm run semear` (`lib/seed/semear.ts`) faz o mesmo, no nome do
- * dono de cada workspace.
- *
- * COMO ACRESCENTAR
- * ----------------
- * Peça ao Claude Code: "quero um agente que faz X". Ele escreve o arquivo em
- * `lib/agents/`, importa aqui, e `npm run verify` confere que a declaração é
- * válida antes de qualquer coisa chegar no banco.
- *
- * ⚠️ APELIDO (`slug`) É PRA SEMPRE. Ele é a chave da materialização: trocar o
- * apelido de uma declaração não renomeia a linha — cria outra, e a antiga vira
- * órfã (fica no banco, intocada). Em base de conhecimento é pior ainda, porque
- * um gatilho do banco congela o apelido e o modelo de embedding.
- *
- * 🔴 `AGENTES` importa `meuAgente` de `_TEMPLATE_agente.ts` — e isso é decisão,
- * não descuido. O prefixo `_TEMPLATE_` normalmente diz "copie-me", mas o
- * produto precisa nascer com UM agente dentro, e criar um segundo arquivo
- * quase idêntico ao molde só pra preencher essa lista seria duplicação.
- * Quando você copiar o molde pra um agente de verdade, troque esta linha pelo
- * import do seu arquivo (ou acrescente o seu do lado — não existe limite).
  */
 
 import { atendimentoAgente } from "@/lib/agents/atendimento";
@@ -43,11 +20,33 @@ export const AGENTES: readonly AgentBlueprint[] = [atendimentoAgente];
 /** As bases de conhecimento deste produto. */
 export const BASES: readonly KnowledgeBaseBlueprint[] = [];
 
-/** Os agendamentos. Todos nascem DESLIGADOS e em modo ensaio. */
-export const AGENDAMENTOS: readonly ScheduleBlueprint[] = [];
+/** Automação diária de fechamento e resumo de atendimentos */
+export const resumoDiarioAtendimento: ScheduleBlueprint = {
+  slug: "resumo-diario",
+  name: "Resumo Diário de Atendimentos",
+  agentSlug: "atendimento",
+  kind: "daily",
+  hour: 19,
+  minute: 0,
+  timezone: "America/Sao_Paulo",
+  input: {
+    instrucao: "Gere um resumo executivo dos atendimentos do dia no WhatsApp da empresa, com perguntas frequentes e solicitações pendentes.",
+  },
+  entrega: { tipo: "nenhuma" },
+};
+
+/** Os agendamentos. Nascem em modo ensaio e podem ser ligados pelo painel de automações. */
+export const AGENDAMENTOS: readonly ScheduleBlueprint[] = [resumoDiarioAtendimento];
+
+/** Webhook para integrações externas (CRM, Typeform, Webhooks externos) */
+export const webhookAtendimento: WebhookBlueprint = {
+  slug: "webhook-atendimento",
+  label: "Integração Externa de Atendimento",
+  agentSlug: "atendimento",
+  esperarResposta: true,
+};
 
 /**
- * Os webhooks. Todos nascem LIGADOS, mas inutilizáveis: o token é sorteado e
- * descartado na hora — só "Gerar token", na tela, mostra um que funciona.
+ * Os webhooks. Nascem associados ao agente de atendimento.
  */
-export const WEBHOOKS: readonly WebhookBlueprint[] = [];
+export const WEBHOOKS: readonly WebhookBlueprint[] = [webhookAtendimento];

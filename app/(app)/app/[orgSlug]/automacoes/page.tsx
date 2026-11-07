@@ -74,8 +74,7 @@ export default async function AutomacoesPage({ params }: Props) {
         <Card className="border-dashed">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <p className="text-sm">
-              Você ainda não tem nenhum agente — e é ele que a automação vai rodar. Peça pro Claude
-              Code criar um.
+              Você ainda não tem nenhum agente ativo para executar esta automação.
             </p>
             <Button
               render={<Link href={`/app/${orgSlug}/agentes`} />}

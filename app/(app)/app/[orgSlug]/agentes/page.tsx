@@ -36,10 +36,8 @@ export default async function AgentsPage({ params }: Props) {
         <span className="label-mono">/ agentes</span>
         <h1 className="font-semibold text-3xl tracking-tight">Agentes</h1>
         <p className="text-muted-foreground text-sm">
-          Um agente é uma inteligência artificial com instruções suas e acesso aos dados deste
-          workspace. Os agentes nascem do código: peça pro Claude Code criar um. Um workspace novo
-          já nasce com ele; este workspace, que já existe, recebe no próximo deploy — ou rode npm
-          run semear agora, sem esperar.
+          Um agente é uma inteligência artificial com instruções personalizadas e ferramentas
+          conectadas ao WhatsApp e aos canais de atendimento do seu negócio.
         </p>
       </div>
 

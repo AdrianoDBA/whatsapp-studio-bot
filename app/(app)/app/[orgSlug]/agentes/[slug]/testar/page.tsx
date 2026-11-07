@@ -60,10 +60,7 @@ export default async function TestarAgentePage({ params }: Props) {
       {agent.status === "archived" && (
         <Card className="border-dashed">
           <CardContent className="p-5 text-sm">
-            Esse agente está aposentado, então ele não roda. Pra reativar, peça pro Claude Code
-            declarar <code className="font-mono text-xs">status: "active"</code> nele — a mudança
-            chega no próximo deploy, ou rode{" "}
-            <code className="font-mono text-xs">npm run semear</code> agora, sem esperar.
+            Esse agente está arquivado e não está executando no momento. Reative-o alterando seu status para ativo.
           </CardContent>
         </Card>
       )}

@@ -81,7 +81,7 @@ export function montarProximosPassos(e: EstadoDoWorkspace): ProximoPasso[] {
   passos.push({
     id: "agente",
     titulo: "Ter um agente no ar",
-    explicacao: "Ele nasce do código: peça pro Claude Code criar um agente pra você.",
+    explicacao: "O agente é instanciado automaticamente para o atendimento do seu workspace.",
     feito: e.agentes > 0,
     acao: { rotulo: "Ver agentes", href: `${base}/agentes` },
     recado: null,

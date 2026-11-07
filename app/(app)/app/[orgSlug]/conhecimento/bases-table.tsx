@@ -23,7 +23,7 @@ export function BasesTable({
         <EmptyState
           icon={LibraryIcon}
           title="Nenhuma base ainda"
-          description="Peça pro Claude Code declarar uma base de conhecimento. Workspace novo já nasce com ela; este aqui recebe no próximo deploy — ou rode npm run semear agora, sem esperar."
+          description="Nenhuma base de conhecimento cadastrada no momento."
         />
       }
     />

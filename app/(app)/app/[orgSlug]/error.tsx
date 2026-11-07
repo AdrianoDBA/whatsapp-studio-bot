@@ -17,8 +17,7 @@ export default function OrgError({
     <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
       <h2 className="font-semibold text-xl">Essa parte não carregou</h2>
       <p className="max-w-md text-muted-foreground text-sm">
-        Tente de novo. Se continuar, copie o código abaixo e mande pro Claude Code contando o que
-        você estava fazendo.
+        Tente de novo. Se o problema persistir, entre em contato com o suporte técnico informando o código abaixo.
       </p>
       {error.digest && (
         <div className="space-y-1">

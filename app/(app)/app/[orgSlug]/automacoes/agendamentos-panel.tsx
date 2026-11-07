@@ -154,7 +154,7 @@ export function AgendamentosPanel({
         {agendamentos.length === 0 ? (
           <EmptyState
             title="Nenhuma automação por horário"
-            description="Peça pro Claude Code declarar uma na lista AGENDAMENTOS, em lib/seed/registro.ts. Workspace novo já nasce com ela; este aqui recebe no próximo deploy — ou rode npm run semear agora, sem esperar."
+            description="Nenhuma automação por horário configurada para este workspace no momento."
           />
         ) : (
           <ul className="divide-y divide-border/60">

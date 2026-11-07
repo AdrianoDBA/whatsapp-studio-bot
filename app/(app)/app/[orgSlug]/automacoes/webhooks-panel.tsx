@@ -85,7 +85,7 @@ export function WebhooksPanel({
         {webhooks.length === 0 ? (
           <EmptyState
             title="Nenhum endereço ainda"
-            description="Peça pro Claude Code declarar um na lista WEBHOOKS, em lib/seed/registro.ts. Workspace novo já nasce com ele; este aqui recebe no próximo deploy — ou rode npm run semear agora, sem esperar."
+            description="Nenhum endereço de webhook configurado para este workspace no momento."
           />
         ) : (
           <ul className="divide-y divide-border/60">

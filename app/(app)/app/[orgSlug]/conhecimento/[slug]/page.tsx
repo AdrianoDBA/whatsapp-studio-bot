@@ -100,7 +100,7 @@ export default async function BaseDeConhecimentoPage({ params }: Props) {
       <p className="text-muted-foreground text-xs">
         Nome e descrição vêm do arquivo que declara esta base (
         <code className="font-mono">lib/knowledge/blueprint.ts</code> +{" "}
-        <code className="font-mono">lib/seed/registro.ts</code>) — peça pro Claude Code editar; a
+        <code className="font-mono">lib/seed/registro.ts</code>); a
         mudança chega no próximo deploy (ou rode <code className="font-mono">npm run semear</code>{" "}
         agora, sem esperar). O apelido (<code className="font-mono">/{base.slug}</code>) e o jeito
         de ler os documentos são congelados assim que a base nasce: pra trocar de modelo, crie outra
