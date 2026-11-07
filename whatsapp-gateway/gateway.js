@@ -77,6 +77,7 @@ function getOrCreateSession(sessionId) {
       status: 'DISCONNECTED',
       qr: null,
       connectedNumber: null,
+      userLid: null,
       lastConnected: null,
       authDir: path.join(AUTH_BASE_DIR, sessionId),
       reconnectTimer: null
@@ -108,6 +109,11 @@ async function startSession(profileId) {
 
   try {
     const { state, saveCreds } = await useMultiFileAuthState(session.authDir);
+
+    if (state.creds?.me) {
+      session.connectedNumber = state.creds.me.id ? state.creds.me.id.split(':')[0] : session.connectedNumber;
+      session.userLid = state.creds.me.lid ? state.creds.me.lid.split(':')[0] : session.userLid;
+    }
 
     const sock = makeWASocket({
       auth: state,
@@ -167,9 +173,10 @@ async function startSession(profileId) {
       } else if (connection === 'open') {
         session.status = 'CONNECTED';
         session.qr = null;
-        session.connectedNumber = sock.user?.id ? sock.user.id.split(':')[0] : 'Conectado';
+        session.connectedNumber = sock.user?.id ? sock.user.id.split(':')[0] : (session.connectedNumber || 'Conectado');
+        session.userLid = sock.user?.lid ? sock.user.lid.split(':')[0] : (session.userLid || null);
         session.lastConnected = new Date().toISOString();
-        console.log(`\n✅ [WHATSAPP CONECTADO] Perfil '${session.apelido}' (${profileId}): +${session.connectedNumber}`);
+        console.log(`\n✅ [WHATSAPP CONECTADO] Perfil '${session.apelido}' (${profileId}): +${session.connectedNumber} (LID: ${session.userLid || 'N/A'})`);
 
         try {
           fetch(`${NEXT_WEBHOOK_URL}/status`, {
@@ -226,17 +233,20 @@ async function startSession(profileId) {
         const isFromMe = Boolean(msg.key.fromMe);
         const cleanPhone = (session.connectedNumber || '').replace(/\D/g, '');
         const cleanRemote = remoteJid.replace(/\D/g, '');
+        const currentLid = (sock.user?.lid ? sock.user.lid.split(':')[0] : (session.userLid || '')).replace(/\D/g, '');
         const last8User = cleanPhone.slice(-8);
         const last8Remote = cleanRemote.slice(-8);
 
-        // Auto-conversa (teste do usuário com o próprio número)
+        // Auto-conversa (quando o dono do bot conversa com ele mesmo no WhatsApp para testar)
         const isSelfChat = isFromMe && (
-          remoteJid.includes(cleanPhone) ||
-          cleanRemote.includes(cleanPhone) ||
+          (Boolean(cleanPhone) && (remoteJid.includes(cleanPhone) || cleanRemote.includes(cleanPhone))) ||
+          (Boolean(currentLid) && (remoteJid.includes(currentLid) || cleanRemote.includes(currentLid))) ||
           (Boolean(last8User) && Boolean(last8Remote) && last8User === last8Remote)
         );
 
-        // Se for mensagem enviada manualmente pelo dono para outros contatos, ignora
+        console.log(`[GATEWAY MSG CHECK] perfil: ${profileId} | fromMe: ${isFromMe} | isSelf: ${isSelfChat} | remote: ${remoteJid} | text: "${text.slice(0, 40)}"`);
+
+        // Se for mensagem enviada manualmente pelo dono para outros contatos normais, não responde (não é bot conversando com cliente)
         if (isFromMe && !isSelfChat) {
           continue;
         }
@@ -252,7 +262,7 @@ async function startSession(profileId) {
           processedMsgIds.delete(oldest);
         }
 
-        const pushName = msg.pushName || 'Cliente';
+        const pushName = msg.pushName || (isSelfChat ? 'Você' : 'Cliente');
         console.log(`[GATEWAY INCOMING] Perfil: ${profileId} | De: ${remoteJid} (${pushName}) | Texto: "${text}" | isSelf: ${isSelfChat}`);
 
         // Forward to Next.js webhook
@@ -396,6 +406,8 @@ app.post('/send', async (req, res) => {
   if (!jid.includes('@')) {
     const cleanPhone = to.replace(/\D/g, '');
     jid = `${cleanPhone}@s.whatsapp.net`;
+  } else {
+    jid = jid.replace(/:[^@]+@/, '@');
   }
 
   try {
