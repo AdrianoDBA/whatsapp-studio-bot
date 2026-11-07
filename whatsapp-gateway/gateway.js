@@ -21,8 +21,9 @@ const app = express();
 app.use(express.json());
 
 const PORT = 5006;
-const FLASK_PORT = process.env.PORT || '5005';
-const FLASK_WEBHOOK_URL = process.env.FLASK_WEBHOOK_URL || `http://127.0.0.1:${FLASK_PORT}/webhook`;
+const NEXT_PORT = process.env.NEXT_PORT || '3000';
+const NEXT_WEBHOOK_URL = process.env.NEXT_WEBHOOK_URL || `http://127.0.0.1:${NEXT_PORT}/api/webhooks/whatsapp`;
+const FLASK_WEBHOOK_URL = NEXT_WEBHOOK_URL;
 const APP_SECRET = process.env.APP_SECRET || 'studio_bot_app_secret_2026';
 const AUTH_BASE_DIR = process.env.AUTH_DIR || (fs.existsSync('/data') ? '/data/auth_session' : path.join(__dirname, 'auth_session'));
 
@@ -143,6 +144,17 @@ async function startSession(profileId) {
         session.qr = null;
         session.connectedNumber = null;
 
+        try {
+          fetch(`${NEXT_WEBHOOK_URL}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: profileId,
+              status: 'disconnected'
+            })
+          }).catch(() => {});
+        } catch (e) {}
+
         if (isLoggedOut) {
           console.log(`[GATEWAY] Perfil '${profileId}' deslogado pelo usuário. Limpando credenciais...`);
           try {
@@ -158,6 +170,19 @@ async function startSession(profileId) {
         session.connectedNumber = sock.user?.id ? sock.user.id.split(':')[0] : 'Conectado';
         session.lastConnected = new Date().toISOString();
         console.log(`\n✅ [WHATSAPP CONECTADO] Perfil '${session.apelido}' (${profileId}): +${session.connectedNumber}`);
+
+        try {
+          fetch(`${NEXT_WEBHOOK_URL}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: profileId,
+              status: 'connected',
+              connectedNumber: session.connectedNumber,
+              lastConnected: session.lastConnected
+            })
+          }).catch(() => {});
+        } catch (e) {}
       }
     });
 
@@ -242,21 +267,24 @@ async function startSession(profileId) {
         const pushName = msg.pushName || 'Cliente';
         console.log(`[GATEWAY INCOMING] Perfil: ${profileId} | De: ${remoteJid} (${pushName}) | Texto: "${text}"`);
 
-        // Forward to Flask webhook
+        // Forward to Next.js webhook
         try {
           const bodyStr = JSON.stringify({
             from: remoteJid,
             name: pushName,
             type: isAudio ? 'audio' : 'text',
-            text: { body: text },
+            text: text,
+            message: { body: text },
             id: msgId,
             source: 'baileys_gateway',
             is_self_chat: isSelfChat,
             phone_number_id: session.connectedNumber || '',
+            phoneNumberId: session.connectedNumber || '',
+            sessionId: profileId,
             profile: profileId
           });
           const sig = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(bodyStr).digest('hex');
-          await fetch(FLASK_WEBHOOK_URL, {
+          await fetch(NEXT_WEBHOOK_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -265,7 +293,7 @@ async function startSession(profileId) {
             body: bodyStr
           });
         } catch (err) {
-          console.error(`[GATEWAY ERROR] Falha ao encaminhar mensagem do perfil '${profileId}' para Flask:`, err.message);
+          console.error(`[GATEWAY ERROR] Falha ao encaminhar mensagem do perfil '${profileId}' para Next.js:`, err.message);
         }
       }
     });
@@ -504,10 +532,12 @@ app.get('/session/:id/status', (req, res) => {
     return res.json({ status: 'disconnected', connected: false });
   }
   res.json({
+    ok: true,
     status: session.status.toLowerCase(),
     connected: session.status === 'CONNECTED',
     connectedNumber: session.connectedNumber,
     lastConnected: session.lastConnected,
+    qr: session.qr || null,
   });
 });
 

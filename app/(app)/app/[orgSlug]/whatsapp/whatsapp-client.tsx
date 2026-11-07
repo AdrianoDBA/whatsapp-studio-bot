@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { QrCodeIcon, SmartphoneIcon, PlugIcon, CheckCircle2Icon, AlertCircleIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { desconectarWhatsAppAction, salvarCloudApiAction, solicitarQrCodeAction } from "@/lib/whatsapp/actions";
+import {
+  consultarStatusWhatsAppAction,
+  desconectarWhatsAppAction,
+  salvarCloudApiAction,
+  solicitarQrCodeAction,
+} from "@/lib/whatsapp/actions";
 import type { WhatsAppInstance } from "@/lib/whatsapp/types";
 
 type Props = {
@@ -30,6 +35,73 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
 
   const isConnected = instance?.status === "connected";
 
+  const verificarStatus = useCallback(
+    async (silencioso = false) => {
+      try {
+        const res = await consultarStatusWhatsAppAction({ orgSlug });
+        if (res.ok && res.data) {
+          if (res.data.isConnected) {
+            setInstance((prev) => ({
+              ...(prev || {
+                id: "",
+                organization_id: "",
+                instance_name: "Principal",
+                provider: "baileys",
+                status: "connected",
+                qr_code: null,
+                phone_number: res.data?.phoneNumber || null,
+                cloud_phone_number_id: null,
+                cloud_waba_id: null,
+                cloud_access_token: null,
+                connected_at: new Date().toISOString(),
+                last_seen_at: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }),
+              status: "connected",
+              phone_number: res.data?.phoneNumber || prev?.phone_number || null,
+              qr_code: null,
+            }));
+            setQrBase64(null);
+            if (!silencioso) {
+              toast.success("WhatsApp conectado com sucesso!");
+            }
+            return true;
+          } else if (res.data.qrCode && res.data.qrCode !== qrBase64) {
+            setQrBase64(res.data.qrCode);
+          }
+        }
+      } catch {
+        // Silencia falha temporária de rede no polling
+      }
+      return false;
+    },
+    [orgSlug, qrBase64],
+  );
+
+  // Polling automático a cada 2.5s para detectar quando o celular ler o QR Code
+  useEffect(() => {
+    if (isConnected) return;
+
+    let cancelado = false;
+    let timer: NodeJS.Timeout | null = null;
+
+    async function tick() {
+      if (cancelado) return;
+      const conectado = await verificarStatus(false);
+      if (!conectado && !cancelado) {
+        timer = setTimeout(tick, 2500);
+      }
+    }
+
+    timer = setTimeout(tick, 1500);
+
+    return () => {
+      cancelado = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isConnected, verificarStatus]);
+
   async function handleGerarQr() {
     setIsLoading(true);
     try {
@@ -42,6 +114,18 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
       }
     } catch {
       toast.error("Erro inesperado de conexão com o servidor.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleVerificarManual() {
+    setIsLoading(true);
+    try {
+      const conectado = await verificarStatus(false);
+      if (!conectado) {
+        toast.info("Ainda aguardando leitura do QR Code pelo celular.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -227,6 +311,16 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
                       <p className="text-xs text-muted-foreground animate-pulse">
                         Aguardando leitura do QR Code pelo celular...
                       </p>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleVerificarManual}
+                        disabled={isLoading}
+                        className="mt-2 text-xs"
+                      >
+                        <RefreshCwIcon className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} />
+                        Já escaneou? Verificar Conexão
+                      </Button>
                     </div>
                   ) : (
                     <div className="text-center py-12 space-y-3">

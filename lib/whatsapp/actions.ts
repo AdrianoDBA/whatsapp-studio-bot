@@ -79,6 +79,78 @@ export async function solicitarQrCodeAction({
   }
 }
 
+export async function consultarStatusWhatsAppAction({
+  orgSlug,
+}: {
+  orgSlug: string;
+}): Promise<
+  ActionResult<{
+    status: string;
+    isConnected: boolean;
+    phoneNumber?: string | null;
+    qrCode?: string | null;
+  }>
+> {
+  try {
+    const { org } = await requireOrgRole({ orgSlug, roles: ["owner", "admin"] });
+    const supabase = await createClient();
+
+    let isConnected = false;
+    let phoneNumber: string | null = null;
+    let qrCode: string | null = null;
+    let currentStatus = "disconnected";
+
+    try {
+      const res = await fetch(`${GATEWAY_URL}/session/${org.id}/status`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        const body = await res.json();
+        isConnected = Boolean(body.connected || body.status === "connected");
+        currentStatus = isConnected ? "connected" : (body.status || "disconnected");
+        phoneNumber = body.connectedNumber || null;
+        qrCode = body.qr || null;
+      }
+    } catch (netErr) {
+      logError("whatsapp.consultarStatusGateway", netErr);
+    }
+
+    if (isConnected) {
+      await supabase
+        .from("whatsapp_instances")
+        .upsert(
+          {
+            organization_id: org.id,
+            provider: "baileys",
+            status: "connected",
+            phone_number: phoneNumber,
+            qr_code: null,
+            connected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "organization_id" },
+        );
+      revalidatePath(`/app/${orgSlug}/whatsapp`);
+    }
+
+    return {
+      ok: true,
+      data: {
+        status: currentStatus,
+        isConnected,
+        phoneNumber,
+        qrCode,
+      },
+    };
+  } catch (e: any) {
+    logError("whatsapp.consultarStatusAction", e);
+    return { ok: false, error: e.message || "Erro ao consultar status do WhatsApp." };
+  }
+}
+
 export async function desconectarWhatsAppAction({
   orgSlug,
 }: {

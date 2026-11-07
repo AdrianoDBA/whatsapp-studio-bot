@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
+import { generateText } from "ai";
+import { buildLanguageModel } from "@/lib/ai/providers";
+import { systemPool } from "@/lib/automation/pg";
 import { logError } from "@/lib/logger";
+import { openSecret } from "@/lib/secrets/crypto";
+
+export const runtime = "nodejs";
 
 const GATEWAY_URL = process.env.WHATSAPP_GATEWAY_URL || "http://127.0.0.1:5006";
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "studio_verify_token_2026";
@@ -21,41 +27,142 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // 1. Suporte ao formato Baileys Gateway
-    if (body.from && body.text) {
-      const from = body.from;
-      const text = body.text;
-      const sessionId = body.sessionId || "default";
+    let from = "";
+    let incomingText = "";
+    let sessionId = "default";
+    let isBaileys = false;
 
-      // Responde com mensagem de atendimento padrão ou invoca o agente
-      const resposta = `Olá! Agradecemos o contato. Sou o assistente virtual de atendimento da empresa. Como posso te ajudar hoje?`;
+    // 1. Suporte a Baileys Gateway
+    if (body.from && (body.text || body.message)) {
+      isBaileys = true;
+      from = body.from;
+      incomingText = typeof body.text === "string" ? body.text : body.text?.body || body.message?.body || "";
+      sessionId = body.sessionId || body.profile || "default";
 
-      // Envia resposta de volta pelo gateway de forma assíncrona
-      fetch(`${GATEWAY_URL}/session/${sessionId}/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: from, text: resposta }),
-      }).catch((err) => logError("whatsapp.sendReply", err));
+      // Ignora mensagens do próprio bot (anti-loop)
+      if (body.is_self_chat && !body.allow_self) {
+        // Ignora
+      }
+    } else {
+      // 2. Suporte a Meta Cloud API
+      const entry = body.entry?.[0];
+      const change = entry?.changes?.[0];
+      const value = change?.value;
+      const message = value?.messages?.[0];
 
-      return NextResponse.json({ ok: true, status: "processed" });
+      if (message && message.from) {
+        from = message.from;
+        incomingText = message.text?.body || "";
+        sessionId = value.metadata?.phone_number_id || "default";
+      }
     }
 
-    // 2. Suporte ao formato Meta Cloud API
-    const entry = body.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
-    const message = value?.messages?.[0];
-
-    if (message && message.from) {
-      const from = message.from;
-      const text = message.text?.body || "";
-      const phoneNumberId = value.metadata?.phone_number_id;
-
-      // Resposta padrão
-      return NextResponse.json({ ok: true, received: true });
+    if (!from || !incomingText.trim()) {
+      return NextResponse.json({ ok: true, ignored: true });
     }
 
-    return NextResponse.json({ ok: true, ignored: true });
+    // Processa a mensagem em segundo plano com o Agente Inteligente
+    (async () => {
+      try {
+        const pool = systemPool();
+
+        // 1. Localiza a organização correspondente
+        let orgId = sessionId;
+        const orgRes = await pool.query(
+          `SELECT id, slug, name FROM public.organizations WHERE id::text = $1 OR slug = $1 LIMIT 1`,
+          [sessionId],
+        );
+
+        let orgName = "AtendeAI";
+        if (orgRes.rows.length > 0) {
+          orgId = orgRes.rows[0].id;
+          orgName = orgRes.rows[0].name;
+        } else {
+          // Se não encontrou por ID direto, pega a primeira organização ativa
+          const firstOrg = await pool.query(`SELECT id, slug, name FROM public.organizations LIMIT 1`);
+          if (firstOrg.rows.length > 0) {
+            orgId = firstOrg.rows[0].id;
+            orgName = firstOrg.rows[0].name;
+          }
+        }
+
+        // 2. Localiza o Agente de Atendimento
+        const agentRes = await pool.query(
+          `SELECT id, slug, name, system_prompt, model, tools
+           FROM public.agents
+           WHERE organization_id = $1 AND (slug = 'atendimento' OR status = 'active')
+           ORDER BY (slug = 'atendimento') DESC
+           LIMIT 1`,
+          [orgId],
+        );
+
+        const agent = agentRes.rows[0];
+        const systemPrompt =
+          agent?.system_prompt ||
+          `Você é a secretária e assistente virtual da empresa ${orgName}. Responda com simpatia, cordialidade e precisão em português.`;
+
+        // 3. Localiza as credenciais de IA configuradas para a organização
+        const credRes = await pool.query(
+          `SELECT provider, ciphertext, key_version
+           FROM public.credentials
+           WHERE organization_id = $1
+           ORDER BY (provider = 'google') DESC, created_at DESC
+           LIMIT 1`,
+          [orgId],
+        );
+
+        let respostaTexto = "";
+
+        if (credRes.rows.length > 0) {
+          const cred = credRes.rows[0];
+          try {
+            const apiKey = openSecret(
+              { ciphertext: cred.ciphertext, keyVersion: cred.key_version },
+              { organizationId: orgId, provider: cred.provider },
+            );
+
+            // Determina o modelo: se for Google, usa o gemini-3.5-flash-lite para estabilidade
+            const provider = cred.provider === "google" ? "google" : "openrouter";
+            const providerModelId =
+              provider === "google" ? "gemini-3.5-flash-lite" : "google/gemini-3.7-flash";
+
+            const model = buildLanguageModel({
+              provider,
+              providerModelId,
+              apiKey,
+            });
+
+            const result = await generateText({
+              model,
+              system: systemPrompt,
+              prompt: incomingText,
+            });
+
+            respostaTexto = result.text.trim();
+          } catch (aiErr: any) {
+            logError("whatsapp.aiGenerationError", aiErr);
+          }
+        }
+
+        // Resposta de fallback caso a IA esteja temporariamente fora ou sem chave
+        if (!respostaTexto) {
+          respostaTexto = `Olá! Agradecemos sua mensagem. Sou o assistente virtual de atendimento da ${orgName}. Recebi seu contato e já vou te auxiliar! Em que posso ajudar você hoje?`;
+        }
+
+        // 4. Envia de volta pelo Gateway Baileys
+        if (isBaileys) {
+          await fetch(`${GATEWAY_URL}/session/${sessionId}/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to: from, text: respostaTexto }),
+          });
+        }
+      } catch (procErr: any) {
+        logError("whatsapp.processMessageError", procErr);
+      }
+    })().catch((bgErr) => logError("whatsapp.backgroundRunner", bgErr));
+
+    return NextResponse.json({ ok: true, status: "queued" });
   } catch (err: any) {
     logError("whatsapp.webhook", err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
