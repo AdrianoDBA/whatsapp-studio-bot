@@ -1,15 +1,72 @@
-.venv/
-__pycache__/
-*.pyc
-logs/
-.env
-studio.db
-whatsapp-gateway/node_modules/
-whatsapp-gateway/auth_info_baileys/
-frontend/node_modules/
-frontend/dist/
-whatsapp-gateway/auth_session/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-static/comprovantes/*.png
-uploads/*
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Test artifacts
+.playwright-mcp/
+*.png
+!public/**/*.png
+
+# Supabase local (senhas da sua máquina — nunca vai pro repositório)
+supabase/.temp/
+supabase/.branches/
+
+# workspace do subagent-driven-development (ledger, briefs, pacotes de revisao)
+.superpowers/
+
+# Os planos e contratos que o Claude Code escreve enquanto constrói.
+# ⚠️ FORA DO REPOSITÓRIO DE PROPÓSITO: o que o aluno baixa é o tarball desta
+# tag, sem filtro nenhum — então tudo que fica rastreado aqui vai pra mão dele.
+# Isto é registro interno de decisão (ondas, contratos de bloco), não material
+# de curso. O material do aluno é `docs/01-comecando/` … `docs/06-agentes-de-ia/`.
+/docs/superpowers/
+legacy_python/
+studio.db
+*.db
+logs/
+data/
+uploads/
 *.zip
+frontend/
+__pycache__/
+whatsapp-gateway/node_modules/
+whatsapp-gateway/auth_session/

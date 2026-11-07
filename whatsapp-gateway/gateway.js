@@ -64,56 +64,28 @@ function unwrapMessageContent(m) {
   return m;
 }
 
-// 4 FIXED PROFILES WITH COMPLETE ISOLATION
-const SESSIONS = {
-  meu_numero: {
-    id: 'meu_numero',
-    apelido: 'Meu número',
-    sock: null,
-    status: 'DISCONNECTED',
-    qr: null,
-    connectedNumber: null,
-    lastConnected: null,
-    authDir: path.join(AUTH_BASE_DIR, 'meu_numero'),
-    reconnectTimer: null
-  },
-  esposa: {
-    id: 'esposa',
-    apelido: 'Esposa',
-    sock: null,
-    status: 'DISCONNECTED',
-    qr: null,
-    connectedNumber: null,
-    lastConnected: null,
-    authDir: path.join(AUTH_BASE_DIR, 'esposa'),
-    reconnectTimer: null
-  },
-  filho: {
-    id: 'filho',
-    apelido: 'Filho',
-    sock: null,
-    status: 'DISCONNECTED',
-    qr: null,
-    connectedNumber: null,
-    lastConnected: null,
-    authDir: path.join(AUTH_BASE_DIR, 'filho'),
-    reconnectTimer: null
-  },
-  bot_estudio: {
-    id: 'bot_estudio',
-    apelido: 'Bot do Estúdio',
-    sock: null,
-    status: 'DISCONNECTED',
-    qr: null,
-    connectedNumber: null,
-    lastConnected: null,
-    authDir: path.join(AUTH_BASE_DIR, 'bot_estudio'),
-    reconnectTimer: null
+// Dynamic Sessions Map - Zero hardcoded profiles or pre-baked sessions
+const SESSIONS = {};
+
+function getOrCreateSession(sessionId) {
+  if (!SESSIONS[sessionId]) {
+    SESSIONS[sessionId] = {
+      id: sessionId,
+      apelido: `Instância ${sessionId}`,
+      sock: null,
+      status: 'DISCONNECTED',
+      qr: null,
+      connectedNumber: null,
+      lastConnected: null,
+      authDir: path.join(AUTH_BASE_DIR, sessionId),
+      reconnectTimer: null
+    };
   }
-};
+  return SESSIONS[sessionId];
+}
 
 async function startSession(profileId) {
-  const session = SESSIONS[profileId];
+  const session = SESSIONS[profileId] || getOrCreateSession(profileId);
   if (!session) return;
 
   if (session.reconnectTimer) {
@@ -304,8 +276,21 @@ async function startSession(profileId) {
 }
 
 function startAllSessions() {
-  for (const pid of Object.keys(SESSIONS)) {
-    startSession(pid);
+  if (fs.existsSync(AUTH_BASE_DIR)) {
+    try {
+      const dirs = fs.readdirSync(AUTH_BASE_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory()) {
+          const credsFile = path.join(AUTH_BASE_DIR, d.name, 'creds.json');
+          if (fs.existsSync(credsFile)) {
+            console.log(`[GATEWAY] Retomando sessão salva para o workspace: ${d.name}`);
+            startSession(d.name);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[GATEWAY] Erro ao carregar sessões salvas:', e.message);
+    }
   }
 }
 
@@ -478,6 +463,111 @@ app.post('/profiles/:profile/reconnect', (req, res) => {
   s.qr = null;
   setTimeout(() => startSession(pid), 500);
   res.json({ ok: true, message: `Reconexão do perfil '${s.apelido}' iniciada.` });
+});
+
+// Dynamic Multi-Tenant Session Management
+app.get('/session/:id/qr', async (req, res) => {
+  const sessionId = req.params.id;
+  const session = getOrCreateSession(sessionId);
+
+  if (session.status === 'CONNECTED') {
+    return res.json({ status: 'connected', connected: true, connectedNumber: session.connectedNumber });
+  }
+
+  if (!session.sock) {
+    startSession(sessionId);
+  }
+
+  // Se já tiver QR pronto
+  if (session.qr) {
+    return res.json({ status: 'qr_ready', connected: false, qr: session.qr });
+  }
+
+  // Espera até 6 segundos para o QR code ser gerado pelo Baileys
+  for (let i = 0; i < 12; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (session.qr) {
+      return res.json({ status: 'qr_ready', connected: false, qr: session.qr });
+    }
+    if (session.status === 'CONNECTED') {
+      return res.json({ status: 'connected', connected: true, connectedNumber: session.connectedNumber });
+    }
+  }
+
+  res.json({ status: session.status, connected: session.status === 'CONNECTED', qr: session.qr });
+});
+
+app.get('/session/:id/status', (req, res) => {
+  const sessionId = req.params.id;
+  const session = SESSIONS[sessionId];
+  if (!session) {
+    return res.json({ status: 'disconnected', connected: false });
+  }
+  res.json({
+    status: session.status.toLowerCase(),
+    connected: session.status === 'CONNECTED',
+    connectedNumber: session.connectedNumber,
+    lastConnected: session.lastConnected,
+  });
+});
+
+app.post('/session/:id/disconnect', (req, res) => {
+  const sessionId = req.params.id;
+  const session = SESSIONS[sessionId];
+  if (!session) {
+    return res.json({ ok: true });
+  }
+
+  session.status = 'DISCONNECTED';
+  session.qr = null;
+  session.connectedNumber = null;
+
+  if (session.sock) {
+    try {
+      session.sock.ev.removeAllListeners();
+      session.sock.end();
+    } catch (e) {}
+    session.sock = null;
+  }
+
+  if (fs.existsSync(session.authDir)) {
+    try {
+      fs.rmSync(session.authDir, { recursive: true, force: true });
+    } catch (e) {}
+  }
+
+  res.json({ ok: true, status: 'disconnected' });
+});
+
+app.post('/session/:id/send', async (req, res) => {
+  const sessionId = req.params.id;
+  const session = SESSIONS[sessionId];
+
+  if (!session || !session.sock || session.status !== 'CONNECTED') {
+    return res.status(400).json({ error: 'WhatsApp desta organização não está conectado' });
+  }
+
+  const { to, text } = req.body;
+  if (!to || !text) {
+    return res.status(400).json({ error: 'Campos to e text são obrigatórios' });
+  }
+
+  let jid = to;
+  if (!jid.includes('@')) {
+    const cleanPhone = to.replace(/\D/g, '');
+    jid = `${cleanPhone}@s.whatsapp.net`;
+  }
+
+  try {
+    const sentMsg = await session.sock.sendMessage(jid, { text });
+    if (sentMsg?.key?.id) {
+      botSentMsgIds.add(sentMsg.key.id);
+      processedMsgIds.add(sentMsg.key.id);
+    }
+    res.json({ status: 'ok', msgId: sentMsg?.key?.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Backward compatibility with legacy /disconnect

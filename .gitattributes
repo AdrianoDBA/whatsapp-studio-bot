@@ -1,0 +1,21 @@
+# Normaliza fim de linha no repositório.
+* text=auto eol=lf
+
+# Estes PRECISAM ficar com fim de linha do Linux (LF), sempre.
+# Se virarem CRLF (padrão do Windows), o container morre no boot com
+# "bad interpreter: no such file or directory" e o aluno não faz ideia do porquê.
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+*.sql text eol=lf
+*.mjs text eol=lf
+
+# Arquivos binários: git não deve tentar converter nada.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary

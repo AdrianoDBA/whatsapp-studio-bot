@@ -1,0 +1,30 @@
+-- supabase/migrations/20260823020000_grant_update_token_webhook.sql
+--
+-- ONDA 7 — Task 8: girar o token do webhook sem trocar o endereço.
+--
+-- ⚠️ ARMADILHA DAS PERMISSÕES POR COLUNA, DE NOVO (ver
+-- 20260821010000_automacao_fila.sql, 20260821030000_correcoes_revisao_bloco_2.sql
+-- e 20260821110000_agente_que_age.sql). `webhook_endpoints` dá `update` COLUNA
+-- A COLUNA pra quem está logado desde que o `revoke update` fechou a tabela
+-- inteira — e `token_hash`/`token_prefix` nunca entraram nessa lista, porque
+-- até aqui ninguém tinha um caminho legítimo pra REESCREVER o segredo (só
+-- criar um novo, via INSERT). Sem esta linha, `girarTokenDoWebhookAction`
+-- falharia em tempo de EXECUÇÃO com "permission denied for column token_hash"
+-- (42501), não em teste nem em typecheck.
+--
+-- Girar o segredo precisa ESCREVER estas duas colunas, e só elas. O grant não
+-- alarga QUEM gira — a policy "admins update webhook endpoints"
+-- (20260821030000_correcoes_revisao_bloco_2.sql:226-233) já restringe a
+-- owner/admin. Alarga só QUAIS COLUNAS eles tocam.
+--
+-- E não abre o descuido clássico (`.update({...linha})` sobrescrevendo o
+-- segredo sem querer): `token_hash` está FORA do `grant select` de propósito
+-- (20260821010000_automacao_fila.sql), então ninguém consegue LER a coluna pra
+-- espalhar de volta num update. O revoke que já existe fecha esse buraco
+-- estruturalmente.
+--
+-- 🔴 DE PROPÓSITO SEM `token_prefix` na lista de select-oculto: `token_prefix`
+-- já está no `select` de tabela inteira que a rota lê pra mostrar "token
+-- whk_ab12…" na lista (ver `lib/automation/types.ts` / `WebhookSummary`) — só
+-- `token_hash` é sensível.
+grant update (token_hash, token_prefix) on public.webhook_endpoints to authenticated;

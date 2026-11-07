@@ -1,0 +1,20 @@
+node_modules
+.next
+.git
+.claude
+.env*.local
+.env
+npm-debug.log
+Dockerfile
+.dockerignore
+docker-compose.yml
+.vscode
+.idea
+README.md
+docs/
+tests/
+# Pasta que a ferramenta do Supabase cria na sua máquina — tem senha local
+# dentro e não serve pra nada dentro da imagem.
+supabase/.temp
+supabase/.branches
+supabase/config.toml
