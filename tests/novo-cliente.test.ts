@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { criarNovoClienteSchema } from "@/lib/orgs/novo-cliente-actions";
+import { criarNovoClienteSchema } from "@/lib/orgs/novo-cliente-schema";
 
 describe("Novo Cliente Action Schema", () => {
   it("valida dados corretos de criação de novo cliente", () => {

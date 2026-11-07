@@ -22,7 +22,7 @@ const secretaryConfigSchema = z.object({
   botActive: z.boolean().optional(),
 });
 
-export type SalvarConfiguracaoInput = z.infer<typeof secretaryConfigSchema>;
+type SalvarConfiguracaoInput = z.infer<typeof secretaryConfigSchema>;
 
 /**
  * Salva as configurações da secretária virtual diretamente pelo workspace,

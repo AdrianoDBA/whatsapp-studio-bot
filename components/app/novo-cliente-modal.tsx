@@ -29,10 +29,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  criarNovoClienteAction,
-  type CriarNovoClienteOutput,
-} from "@/lib/orgs/novo-cliente-actions";
+import { criarNovoClienteAction } from "@/lib/orgs/novo-cliente-actions";
+import type { CriarNovoClienteOutput } from "@/lib/orgs/novo-cliente-schema";
 import { TONE_OPTIONS, type SecretaryTone } from "@/lib/whatsapp/secretary-prompt";
 
 type Props = {
