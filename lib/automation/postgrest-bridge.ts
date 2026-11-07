@@ -210,6 +210,7 @@ export const COLUNAS_DA_PONTE = {
     "triggered_by",
   ],
   agents: [
+    "config",
     "created_at",
     "created_by",
     "description",

@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, ArrowLeftIcon, MessageSquareIcon, PlayIcon } from "lucide-react";
+import { AlertTriangleIcon, ArrowLeftIcon, MessageSquareIcon, PlayIcon, WrenchIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +13,11 @@ import { requireOrgMember } from "@/lib/auth/guards";
 import { formatPricePerMTok, formatTokens } from "@/lib/format";
 import { getProviderInfo } from "@/lib/secrets/providers";
 import { createClient } from "@/lib/supabase/server";
+import { SecretaryCustomizer } from "./secretary-customizer";
 
 type Props = { params: Promise<{ orgSlug: string; slug: string }> };
 
-export const metadata = { title: "Agente" };
+export const metadata = { title: "Agente de Atendimento" };
 
 const situacaoLabel: Record<AgentStatus, string> = {
   draft: "Rascunho",
@@ -24,19 +25,9 @@ const situacaoLabel: Record<AgentStatus, string> = {
   archived: "Aposentado",
 };
 
-/**
- * Como este agente está montado — LEITURA, sem campo editável.
- *
- * Qualquer membro ABRE (pra ver como o agente está montado e ir pro
- * playground). Não existe mais botão de salvar nem de apagar: o agente nasce
- * de um arquivo (`lib/agents/blueprint.ts` + `lib/seed/registro.ts`) e é
- * gravado por `materializarWorkspace`. Mudar prompt, modelo, ferramentas ou
- * aposentar (`status: "archived"`) é editar aquele arquivo e materializar de
- * novo — nunca esta tela.
- */
 export default async function AgentEditorPage({ params }: Props) {
   const { orgSlug, slug } = await params;
-  const { org } = await requireOrgMember({ orgSlug });
+  const { org, role } = await requireOrgMember({ orgSlug });
 
   const agent = await getAgentBySlug(org.id, slug);
   if (!agent) notFound();
@@ -44,8 +35,6 @@ export default async function AgentEditorPage({ params }: Props) {
   const ficha = getModel(agent.model);
   const provedor = ficha ? getProviderInfo(ficha.provider) : null;
 
-  // Só pra avisar se o modelo escolhido no arquivo não tem chave utilizável
-  // hoje neste workspace — a mesma checagem que o antigo seletor fazia.
   const supabase = await createClient();
   const comChave = await listConfiguredAiProviders(org.id, supabase);
   const temChaveDoModelo = ficha ? comChave.includes(ficha.provider) : false;
@@ -56,8 +45,10 @@ export default async function AgentEditorPage({ params }: Props) {
     catalogo: catalogo.find((t) => t.id === id),
   }));
 
+  const podeEditar = role === "owner" || role === "admin";
+
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="max-w-4xl space-y-8 pb-12">
       <Button
         render={<Link href={`/app/${orgSlug}/agentes`} />}
         nativeButton={false}
@@ -66,7 +57,7 @@ export default async function AgentEditorPage({ params }: Props) {
         className="gap-1.5 text-muted-foreground"
       >
         <ArrowLeftIcon className="h-3.5 w-3.5" />
-        Voltar
+        Voltar para Agentes
       </Button>
 
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -90,9 +81,6 @@ export default async function AgentEditorPage({ params }: Props) {
           >
             {situacaoLabel[agent.status]}
           </Badge>
-          {/* "Conversar" vem antes de "Testar" de propósito: conversar é o que
-              o aluno quer fazer com o agente dele; testar é o que ele faz UMA
-              vez, pra ver o passo a passo de um pedido só. */}
           <Button
             render={<Link href={`/app/${orgSlug}/agentes/${agent.slug}/conversar`} />}
             nativeButton={false}
@@ -100,7 +88,7 @@ export default async function AgentEditorPage({ params }: Props) {
             className="gap-1.5"
           >
             <MessageSquareIcon className="h-3.5 w-3.5" />
-            Conversar
+            Conversar no Painel
           </Button>
           <Button
             render={<Link href={`/app/${orgSlug}/agentes/${agent.slug}/testar`} />}
@@ -115,49 +103,50 @@ export default async function AgentEditorPage({ params }: Props) {
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="border-b border-border/60 bg-card/40 py-3">
-          <CardTitle className="label-mono text-[10px]">/ como ele funciona</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-8 p-6">
-          <p className="rounded-lg border border-border/60 bg-muted/30 p-3 text-muted-foreground text-sm">
-            Isso tudo vem do arquivo que define este agente. Pra mudar instruções, modelo ou
-            ferramentas, peça pro Claude Code editar o arquivo — a mudança chega aqui no próximo
-            deploy (ou rode npm run semear agora, sem esperar). Pra aposentar o agente, peça pra
-            declarar <code className="font-mono text-xs">status: "archived"</code> nele.
-          </p>
+      {/* Editor e Personalizador Visual do Atendimento */}
+      <SecretaryCustomizer
+        orgSlug={orgSlug}
+        orgName={org.name}
+        agentId={agent.id}
+        initialPrompt={agent.system_prompt}
+        initialConfig={(agent.config as any) ?? null}
+        podeEditar={podeEditar}
+      />
 
-          <div className="space-y-1.5">
-            <p className="font-medium text-sm">Instruções</p>
-            <p className="whitespace-pre-wrap rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
-              {agent.system_prompt}
-            </p>
+      {/* Ficha Técnica, Ferramentas e Infraestrutura */}
+      <Card className="overflow-hidden border-border/80">
+        <CardHeader className="border-b border-border/60 bg-muted/20 py-3">
+          <div className="flex items-center gap-2">
+            <WrenchIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            <CardTitle className="label-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              Infraestrutura & Ferramentas Conectadas
+            </CardTitle>
           </div>
-
+        </CardHeader>
+        <CardContent className="space-y-6 p-6">
           <div className="space-y-1.5">
-            <p className="font-medium text-sm">Modelo</p>
-            <div className="rounded-lg border border-border/60 p-3">
+            <p className="font-medium text-xs">Modelo de Linguagem (IA)</p>
+            <div className="rounded-lg border border-border/60 p-3 bg-muted/10">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm">{ficha ? ficha.label : agent.model}</span>
+                <span className="font-medium text-sm">{ficha ? ficha.label : agent.model}</span>
                 {provedor && <span className="label-mono text-[10px]">{provedor.label}</span>}
               </div>
               {ficha && (
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                  entrada {formatPricePerMTok(ficha.inputMicrosPerMillion)} · saída{" "}
-                  {formatPricePerMTok(ficha.outputMicrosPerMillion)} · cabe{" "}
-                  {formatTokens(ficha.contextWindow)} tokens de conversa
+                  Entrada {formatPricePerMTok(ficha.inputMicrosPerMillion)} · Saída{" "}
+                  {formatPricePerMTok(ficha.outputMicrosPerMillion)} · Janela de contexto{" "}
+                  {formatTokens(ficha.contextWindow)} tokens
                 </p>
               )}
               {!temChaveDoModelo && (
                 <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                   <AlertTriangleIcon className="h-3 w-3 text-chart-3" />
-                  Sem chave configurada pro {provedor?.label ?? "provedor"} neste workspace — o
-                  agente não roda até alguém cadastrar uma.
+                  Sem chave configurada para o provedor neste workspace — o agente não rodará até alguém cadastrar uma.
                   <Link
                     href={`/app/${orgSlug}/settings/integracoes`}
-                    className="text-primary underline-offset-2 hover:underline"
+                    className="text-primary underline-offset-2 hover:underline ml-1"
                   >
-                    Cadastrar chave
+                    Cadastrar chave agora
                   </Link>
                 </p>
               )}
@@ -165,29 +154,30 @@ export default async function AgentEditorPage({ params }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <p className="font-medium text-sm">Ferramentas</p>
+            <p className="font-medium text-xs">Ferramentas Nativas Habilitadas ({ferramentas.length})</p>
             {ferramentas.length === 0 ? (
-              <p className="rounded-lg border border-border/60 border-dashed p-3 text-muted-foreground text-sm">
-                Nenhuma — este agente só conversa.
+              <p className="rounded-lg border border-border/60 border-dashed p-3 text-muted-foreground text-xs">
+                Nenhuma — este agente só conversa sem ferramentas adicionais.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {ferramentas.map(({ id, catalogo: c }) => (
                   <div
                     key={id}
                     className={`rounded-lg border p-3 ${
-                      c ? "border-border/60" : "border-destructive/40 bg-destructive/5"
+                      c ? "border-border/60 bg-muted/10" : "border-destructive/40 bg-destructive/5"
                     }`}
                   >
                     {c ? (
                       <>
-                        <p className="font-medium text-sm">{c.label}</p>
-                        <p className="text-muted-foreground text-sm">{c.description}</p>
+                        <p className="font-medium text-xs text-foreground">{c.label}</p>
+                        <p className="mt-0.5 text-muted-foreground text-[11px] leading-snug">
+                          {c.description}
+                        </p>
                       </>
                     ) : (
-                      <p className="text-destructive text-sm">
-                        <span className="font-mono text-xs">{id}</span> — essa ferramenta não existe
-                        mais em código.
+                      <p className="text-destructive text-xs">
+                        <span className="font-mono text-xs">{id}</span> — ferramenta descontinuada.
                       </p>
                     )}
                   </div>
@@ -196,20 +186,20 @@ export default async function AgentEditorPage({ params }: Props) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="space-y-1">
-              <p className="font-medium text-sm">Criatividade</p>
-              <p className="font-mono text-primary text-sm">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 border-t border-border/40 pt-4">
+            <div className="space-y-0.5">
+              <p className="text-[11px] text-muted-foreground">Criatividade (Temperatura)</p>
+              <p className="font-mono text-primary text-sm font-semibold">
                 {agent.temperature.toLocaleString("pt-BR", { minimumFractionDigits: 1 })}
               </p>
             </div>
-            <div className="space-y-1">
-              <p className="font-medium text-sm">Passos por execução</p>
-              <p className="font-mono text-primary text-sm">{agent.max_steps}</p>
+            <div className="space-y-0.5">
+              <p className="text-[11px] text-muted-foreground">Passos por execução</p>
+              <p className="font-mono text-primary text-sm font-semibold">{agent.max_steps}</p>
             </div>
-            <div className="space-y-1">
-              <p className="font-medium text-sm">Tamanho máximo da resposta</p>
-              <p className="font-mono text-primary text-sm">
+            <div className="space-y-0.5">
+              <p className="text-[11px] text-muted-foreground">Teto de resposta</p>
+              <p className="font-mono text-primary text-sm font-semibold">
                 {formatTokens(agent.max_output_tokens)} tokens
               </p>
             </div>

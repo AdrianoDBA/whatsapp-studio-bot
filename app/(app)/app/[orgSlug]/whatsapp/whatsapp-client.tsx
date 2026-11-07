@@ -1,8 +1,19 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { QrCodeIcon, SmartphoneIcon, PlugIcon, CheckCircle2Icon, AlertCircleIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import {
+  QrCodeIcon,
+  SmartphoneIcon,
+  PlugIcon,
+  CheckCircle2Icon,
+  AlertCircleIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+  SparklesIcon,
+  ArrowRightIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -234,6 +245,33 @@ export function WhatsAppClient({ orgSlug, initialInstance }: Props) {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Atalho para Personalização da Secretária */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <SparklesIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Personalizar Secretária & Serviços</p>
+              <p className="text-xs text-muted-foreground">
+                Defina o nome da assistente, tom de conversa e a tabela de preços/serviços que ela
+                usará para responder seus clientes neste WhatsApp.
+              </p>
+            </div>
+          </div>
+          <Button
+            render={<Link href={`/app/${orgSlug}/agentes/atendimento`} />}
+            nativeButton={false}
+            size="sm"
+            className="shrink-0 gap-1.5"
+          >
+            Personalizar Atendimento
+            <ArrowRightIcon className="h-4 w-4" />
+          </Button>
         </CardContent>
       </Card>
 

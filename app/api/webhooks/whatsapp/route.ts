@@ -88,7 +88,7 @@ export async function POST(req: Request) {
 
         // 2. Localiza o Agente de Atendimento
         const agentRes = await pool.query(
-          `SELECT id, slug, name, system_prompt, model, tools
+          `SELECT id, slug, name, system_prompt, model, tools, config
            FROM public.agents
            WHERE organization_id = $1 AND (slug = 'atendimento' OR status = 'active')
            ORDER BY (slug = 'atendimento') DESC
@@ -97,9 +97,13 @@ export async function POST(req: Request) {
         );
 
         const agent = agentRes.rows[0];
+        const cfg = agent?.config || {};
+        const nomeAssistente = cfg.assistantName || "assistente virtual";
+        const nomeEmpresa = cfg.companyName || orgName;
+
         const systemPrompt =
           agent?.system_prompt ||
-          `Você é a secretária e assistente virtual da empresa ${orgName}. Responda com simpatia, cordialidade e precisão em português.`;
+          `Você é ${nomeAssistente}, a secretária e assistente virtual da empresa ${nomeEmpresa}. Responda com simpatia, cordialidade e precisão em português.`;
 
         // 3. Localiza as credenciais de IA configuradas para a organização
         const credRes = await pool.query(
@@ -146,7 +150,7 @@ export async function POST(req: Request) {
 
         // Resposta de fallback caso a IA esteja temporariamente fora ou sem chave
         if (!respostaTexto) {
-          respostaTexto = `Olá! Agradecemos sua mensagem. Sou o assistente virtual de atendimento da ${orgName}. Recebi seu contato e já vou te auxiliar! Em que posso ajudar você hoje?`;
+          respostaTexto = `Olá! Agradecemos sua mensagem. Sou ${nomeAssistente}, assistente virtual da ${nomeEmpresa}. Recebi seu contato e já vou te auxiliar! Em que posso ajudar você hoje?`;
         }
 
         // 4. Envia de volta pelo Gateway Baileys
