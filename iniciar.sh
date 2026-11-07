@@ -11,16 +11,12 @@ echo "   🚀 INICIANDO ATENDEAI — SAAS COM WHATSAPP & IA"
 echo "=========================================================="
 echo ""
 
-# 1. Garante que .env.local existe com as credenciais locais do Supabase
+# 1. Garante que .env.local existe
 if [ ! -f "$DIR/.env.local" ]; then
-  echo "⚙️ Configurando .env.local com Supabase local..."
-  cat << 'EOF' > "$DIR/.env.local"
-SUPABASE_URL=http://127.0.0.1:44321
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:44322/postgres
-ENCRYPTION_KEY=D41FrgAsSo6/jC3Ow47Fa9KT/UgRDMeKaEzKhpN5ft0=
-WHATSAPP_GATEWAY_URL=http://127.0.0.1:5006
-EOF
+  echo "⚙️ Configurando .env.local..."
+  if [ -f "$DIR/.env.example" ]; then
+    cp "$DIR/.env.example" "$DIR/.env.local"
+  fi
 fi
 
 # 2. Confere se o Supabase local está ativo

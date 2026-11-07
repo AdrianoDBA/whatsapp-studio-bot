@@ -59,7 +59,7 @@ export const CREDENTIAL_PROVIDERS: readonly CredentialProviderInfo[] = [
       "Chave direto com o Google, a empresa do Gemini. Pegue no Google AI Studio — " +
       "tem uma faixa gratuita generosa pra testar.",
     helpUrl: "https://aistudio.google.com/apikey",
-    keyHint: "Começa com AIza",
+    keyHint: "Começa com AIza ou AQ.",
     keyPrefix: "AIza",
     hasSenderField: false,
     isAiProvider: true,
@@ -122,6 +122,12 @@ export function listAiProviders(): readonly CredentialProviderInfo[] {
 export function conferirPrefixoDaChave(id: CredentialProvider, chave: string): string | null {
   const meu = getProviderInfo(id);
   const limpa = chave.trim();
+
+  // O Google gera tanto chaves com prefixo clássico AIza... quanto com o formato recente AQ....
+  if (limpa.startsWith("AQ.")) {
+    if (id === "google") return null;
+    return `Essa chave parece ser de outro provedor: "Google (Gemini)". Cole ela no campo "Google (Gemini)".`;
+  }
 
   // De quem é essa chave, afinal? O prefixo mais longo que casa ganha.
   const dono = CREDENTIAL_PROVIDERS.filter((p) => limpa.startsWith(p.keyPrefix)).sort(
