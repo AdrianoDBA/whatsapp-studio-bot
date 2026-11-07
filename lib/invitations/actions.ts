@@ -15,9 +15,16 @@ import {
   createInvitationSchema,
 } from "./schemas";
 
+export type CreateInvitationOutput = {
+  emailSent: boolean;
+  acceptUrl: string;
+  whatsappMessage: string;
+  token: string;
+};
+
 export async function createInvitationAction(
   input: CreateInvitationInput,
-): Promise<ActionResult<{ emailSent: boolean }>> {
+): Promise<ActionResult<CreateInvitationOutput>> {
   const parsed = createInvitationSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
@@ -58,15 +65,36 @@ export async function createInvitationAction(
 
   const acceptUrl = `${await getAppUrl()}/aceitar-convite?token=${invitation.token}`;
 
-  const provider = await getEmailProvider({ organizationId: org.id, supabase });
-  const result = await provider.send({
-    to: parsed.data.email,
-    subject: `${inviterName} te convidou para ${org.name}`,
-    react: InvitationEmail({ inviterName, orgName: org.name, acceptUrl }),
-  });
+  let emailSent = false;
+  try {
+    const provider = await getEmailProvider({ organizationId: org.id, supabase });
+    const result = await provider.send({
+      to: parsed.data.email,
+      subject: `${inviterName} te convidou para ${org.name}`,
+      react: InvitationEmail({ inviterName, orgName: org.name, acceptUrl }),
+    });
+    emailSent = result.ok;
+  } catch {
+    emailSent = false;
+  }
+
+  const whatsappMessage = `Olá! Você foi convidado para o workspace *${org.name}* no AtendeAI 🎉
+
+Acesse o link abaixo para criar sua senha de acesso e ativar seu usuário:
+👉 ${acceptUrl}
+
+Qualquer dúvida estou à disposição!`;
 
   revalidatePath(`/app/${parsed.data.orgSlug}/settings/members`);
-  return { ok: true, data: { emailSent: result.ok } };
+  return {
+    ok: true,
+    data: {
+      emailSent,
+      acceptUrl,
+      whatsappMessage,
+      token: invitation.token,
+    },
+  };
 }
 
 export async function acceptInvitationAction(

@@ -4,6 +4,7 @@ import { CheckIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NovoClienteModal } from "./novo-cliente-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,6 +78,9 @@ export function OrgSwitcher({ current, orgs }: Props) {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        <div className="px-1 py-0.5">
+          <NovoClienteModal variant="dropdown" />
+        </div>
         <DropdownMenuItem render={<Link href="/onboarding?new=1" className="gap-2" />}>
           <PlusIcon className="h-4 w-4" />
           Novo workspace

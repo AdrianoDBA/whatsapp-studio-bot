@@ -7,7 +7,9 @@ import { temPendencia } from "@/lib/dashboard/passos";
 import { getDadosDoInicio } from "@/lib/dashboard/queries";
 import { formatTetoUsd } from "@/lib/limits/money";
 import { createClient } from "@/lib/supabase/server";
+import { getWhatsAppInstance } from "@/lib/whatsapp/queries";
 import { DashboardChart } from "./dashboard-chart";
+import { GuiaAtivacaoCliente } from "./guia-ativacao";
 import { KpiCard } from "./kpi-card";
 import { ProximasAutomacoes } from "./proximas-automacoes";
 import { ProximosPassos } from "./proximos-passos";
@@ -45,10 +47,18 @@ export default async function DashboardPage({ params }: Props) {
   const ehDonoDaPlataforma = await isPlatformAdmin(user.id);
 
   const supabase = await createClient();
-  const [{ data: profile }, dados] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
-    getDadosDoInicio({ orgId: org.id, orgSlug, administra, ehDonoDaPlataforma }),
-  ]);
+  const [{ data: profile }, dados, whatsappInstance, { data: agentAtendimento }] =
+    await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+      getDadosDoInicio({ orgId: org.id, orgSlug, administra, ehDonoDaPlataforma }),
+      getWhatsAppInstance(org.id),
+      supabase
+        .from("agents")
+        .select("id, name, slug, config")
+        .eq("organization_id", org.id)
+        .eq("slug", "atendimento")
+        .maybeSingle(),
+    ]);
   const displayName = profile?.full_name ?? user.email ?? "";
 
   const base = `/app/${orgSlug}`;
@@ -75,6 +85,14 @@ export default async function DashboardPage({ params }: Props) {
           </span>
         </div>
       </div>
+
+      {/* Guia de Ativação do Cliente (Onboarding em 2 passos: WhatsApp + Secretária) */}
+      <GuiaAtivacaoCliente
+        orgSlug={orgSlug}
+        whatsappStatus={whatsappInstance?.status ?? "disconnected"}
+        whatsappPhone={whatsappInstance?.phone_number ?? null}
+        agentConfig={(agentAtendimento?.config as any) ?? null}
+      />
 
       {/* O que falta configurar — some sozinho quando não falta nada. */}
       {temPendencia(dados.passos) && <ProximosPassos passos={dados.passos} />}

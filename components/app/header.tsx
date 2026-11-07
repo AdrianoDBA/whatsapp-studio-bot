@@ -1,5 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { NovoClienteModal } from "./novo-cliente-modal";
 import { ThemeToggle } from "./theme-toggle";
 import { UserDropdown } from "./user-dropdown";
 
@@ -19,6 +20,9 @@ export function AppHeader({ user, orgSlug }: Props) {
       <Separator orientation="vertical" className="h-5" />
 
       <div className="flex-1" />
+
+      {/* Botão de entrega rápida de Novo Cliente */}
+      <NovoClienteModal variant="header" />
 
       {/* Environment badge */}
       <div className="hidden items-center gap-1.5 rounded-full border border-border/60 bg-card/60 px-2.5 py-1 sm:flex">
